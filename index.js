@@ -1,3 +1,5 @@
+const { join } = require('bare-path')
+const { spawn } = require('bare-subprocess')
 const {
   Program,
   // sequence,
@@ -14,6 +16,23 @@ const { filterMp3Files } = require('./lib/utils.js')
 const constants = {
   FP_PANEL: 0,
   PREVIEW_PANEL: 1
+}
+
+class Player {
+  constructor() {
+    this.process = null
+  }
+
+  play(path) {
+    this.process = spawn('afplay', [path])
+  }
+
+  stop() {
+    if (this.process) {
+      this.process.kill()
+      this.process = null
+    }
+  }
 }
 
 class Preview {
@@ -38,6 +57,7 @@ class Preview {
 
 class App {
   constructor() {
+    this.player = new Player()
     this.width = 80
     this.height = 24
     this.bottomPadding = 4
@@ -48,6 +68,7 @@ class App {
     this.debugMessage = 0
     this.pannels = 2 // how many pannels the app has
     this.spinner = spinner.create({ fps: 12 })
+    this.currentDir = null
   }
 
   init() {
@@ -62,8 +83,8 @@ class App {
       return [this, null]
     }
     if (msg.type === 'filepicker.entries') {
+      this.currentDir = msg.dir
       this._setPreviewItems(msg.dir)
-      // return [this, null]
     }
     if (msg.type === 'key' && key.matches(msg, 'q', 'ctrl+c')) {
       return [this, quit]
@@ -85,12 +106,17 @@ class App {
     }
 
     if (this.selectedPanel % this.pannels === constants.FP_PANEL) {
-      // fp active
       return this._updateFp(msg)
     }
 
     if (this.selectedPanel % this.pannels === constants.PREVIEW_PANEL) {
-      // preview active
+      if (key.matches(msg, 'enter')) {
+        const path = join(this.currentDir, this.preview.list.selectedItem())
+        this.debugMessage = 'playing: ' + path
+        this.player.stop()
+        this.player.play(path)
+        return [this, null]
+      }
       return this.preview.update(msg)
     }
 
@@ -141,9 +167,14 @@ class App {
 
     const body = style.joinHorizontal(style.position.top, fp, ' ', preview)
 
-    const footer = ['  ↑/↓ move · ↵/→ open · ⌫/← up · q quit ']
+    const footer = ['  ↑/↓ move · ↵/→ open · ⌫/← up · q quit ', ' ']
 
-    return style.joinVertical(style.position.left, body, ' ', footer[this.selectedPanel])
+    return style.joinVertical(
+      style.position.left,
+      body,
+      ' ',
+      footer[this.selectedPanel] + this.debugMessage
+    )
   }
 }
 

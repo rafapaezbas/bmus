@@ -12,7 +12,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@holepunchto/bare-tui": "github:holepunchto/bare-tui#pre-merge"
+    "@holepunchto/bare-tui": "github:holepunchto/bare-tui#pre-merge",
+    "bare-subprocess": "^6.1.0"
   },
   "devDependencies": {
     "lunte": "^1.8.0",
