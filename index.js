@@ -66,13 +66,14 @@ class App {
     this.picked = null
     this.selectedPanel = 0
     this.debugMessage = 0
-    this.pannels = 2 // how many pannels the app has
+    this.pannels = 2
     this.spinner = spinner.create({ fps: 12 })
     this.currentDir = null
+    this.isPlaying = false
+    this.currentTrack = null
   }
 
   init() {
-    // return sequence(this.fp.init(), this.spinner.init())
     return this.fp.init()
   }
 
@@ -112,7 +113,9 @@ class App {
     if (this.selectedPanel % this.pannels === constants.PREVIEW_PANEL) {
       if (key.matches(msg, 'enter')) {
         const path = join(this.currentDir, this.preview.list.selectedItem())
-        this.debugMessage = 'playing: ' + path
+        this.isPlaying = true
+        this.currentTrack = this.preview.list.selectedItem()
+        this.debugMessage = '♪ ' + this.currentTrack
         this.player.stop()
         this.player.play(path)
         return [this, null]
@@ -140,41 +143,47 @@ class App {
   }
 
   view() {
+    const isFilepanel = this.selectedPanel % this.pannels === constants.FP_PANEL
+    const isPreviewPanel = this.selectedPanel % this.pannels === constants.PREVIEW_PANEL
+
     const fp = style()
       .border(style.borders.rounded)
-      .borderForeground(this.selectedPanel % this.pannels === constants.FP_PANEL ? 'red' : 'blue')
+      .borderForeground(isFilepanel ? '#00D7FF' : '#44475A')
       .padding(0, 1)
       .width(this.width / 6)
       .height(this.height - this.bottomPadding)
       .render(this.fp.view())
 
-    const spinner = style().bold(true).foreground('green').render(this.spinner.view())
-
     const preview = style()
       .border(style.borders.rounded)
-      .borderForeground(
-        this.selectedPanel % this.pannels === constants.PREVIEW_PANEL ? 'red' : 'blue'
-      )
+      .borderForeground(isPreviewPanel ? '#00D7FF' : '#44475A')
       .padding(0, 1)
       .width(this.width / 2)
       .height(this.height - this.bottomPadding)
-      // .render(spinner + ' hello tui!')
       .render(
         this.preview.list.items.length
           ? this.preview.view(this.width / 2, this.height - this.bottomPadding)
-          : 'No items'
+          : style().foreground('#6272A4').italic(true).render('No mp3 files here')
       )
 
     const body = style.joinHorizontal(style.position.top, fp, ' ', preview)
 
-    const footer = ['  ↑/↓ move · ↵/→ open · ⌫/← up · q quit ', ' ']
+    // Footer: keybinds on left, now-playing on right
+    const keys = style()
+      .foreground('#6272A4')
+      .render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
 
-    return style.joinVertical(
-      style.position.left,
-      body,
-      ' ',
-      footer[this.selectedPanel] + this.debugMessage
-    )
+    const nowPlaying =
+      this.isPlaying && this.currentTrack
+        ? style()
+            .foreground('#FF79C6')
+            .bold(true)
+            .render('♪ ' + this.currentTrack)
+        : style().foreground('#44475A').render('nothing playing')
+
+    const footer = style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
+
+    return style.joinVertical(style.position.left, body, ' ', footer)
   }
 }
 
