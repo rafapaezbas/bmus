@@ -18,6 +18,24 @@ const constants = {
   PREVIEW_PANEL: 1
 }
 
+// Wrap bare-fs so the filepicker never sees mp3 files — only folders and
+// non-audio files pass through. Mp3s are shown exclusively in the preview panel.
+function createFoldersOnlyFs () {
+  const fs = require('bare-fs')
+  return {
+    readdir (dir, opts, cb) {
+      fs.readdir(dir, opts, (err, entries) => {
+        if (err) return cb(err)
+        const filtered = entries.filter(entry => {
+          if (entry.isDirectory()) return true
+          return !entry.name.toLowerCase().endsWith('.mp3')
+        })
+        cb(null, filtered)
+      })
+    }
+  }
+}
+
 class Player {
   constructor() {
     this.process = null
@@ -60,8 +78,8 @@ class App {
     this.player = new Player()
     this.width = 80
     this.height = 24
-    this.bottomPadding = 4
-    this.fp = filepicker.create()
+    this.bottomPadding = 7
+    this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
     this.preview = new Preview()
     this.picked = null
     this.selectedPanel = 0
@@ -158,7 +176,7 @@ class App {
       .border(style.borders.rounded)
       .borderForeground(isPreviewPanel ? '#00D7FF' : '#44475A')
       .padding(0, 1)
-      .width(this.width / 2)
+      .width((this.width / 6) * 5 - 8)
       .height(this.height - this.bottomPadding)
       .render(
         this.preview.list.items.length
@@ -168,22 +186,31 @@ class App {
 
     const body = style.joinHorizontal(style.position.top, fp, ' ', preview)
 
-    // Footer: keybinds on left, now-playing on right
-    const keys = style()
-      .foreground('#6272A4')
-      .render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
+    const logo = style().foreground('#FF79C6').bold(true).render('♫ bare-tui-player')
+    const version = style().foreground('#44475A').render('v1.0.0')
+    const headerNowPlaying = this.isPlaying && this.currentTrack
+      ? style().foreground('#6272A4').render('playing: ') + style().foreground('#00D7FF').render(this.currentTrack)
+      : style().foreground('#44475A').render('─'.repeat(Math.max(0, this.width - 24)))
 
-    const nowPlaying =
-      this.isPlaying && this.currentTrack
-        ? style()
-            .foreground('#FF79C6')
-            .bold(true)
-            .render('♪ ' + this.currentTrack)
-        : style().foreground('#44475A').render('nothing playing')
+    const header = style()
+      .border(style.borders.rounded)
+      .borderForeground('#44475A')
+      .width(this.width - 2)
+      .render(
+        style.joinHorizontal(style.position.top,
+          logo, '  ', version, '   ', headerNowPlaying
+        )
+      )
+
+    const keys = style().foreground('#6272A4').render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
+
+    const nowPlaying = this.isPlaying && this.currentTrack
+      ? style().foreground('#FF79C6').bold(true).render('♪ ' + this.currentTrack)
+      : style().foreground('#44475A').render('nothing playing')
 
     const footer = style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
 
-    return style.joinVertical(style.position.left, body, ' ', footer)
+    return style.joinVertical(style.position.left, header, body, ' ', footer)
   }
 }
 
