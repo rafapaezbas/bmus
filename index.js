@@ -1,5 +1,4 @@
 const { join } = require('bare-path')
-const { spawn } = require('bare-subprocess')
 const {
   Program,
   // sequence,
@@ -8,69 +7,13 @@ const {
   filepicker,
   style,
   // viewport,
-  spinner,
-  list
+  spinner
 } = require('@holepunchto/bare-tui')
-const { filterMp3Files } = require('./lib/utils.js')
+const { filterMp3Files, Player, Preview, createFoldersOnlyFs } = require('./lib/utils.js')
 
 const constants = {
   FP_PANEL: 0,
   PREVIEW_PANEL: 1
-}
-
-// Wrap bare-fs so the filepicker never sees mp3 files — only folders and
-// non-audio files pass through. Mp3s are shown exclusively in the preview panel.
-function createFoldersOnlyFs () {
-  const fs = require('bare-fs')
-  return {
-    readdir (dir, opts, cb) {
-      fs.readdir(dir, opts, (err, entries) => {
-        if (err) return cb(err)
-        const filtered = entries.filter(entry => {
-          if (entry.isDirectory()) return true
-          return !entry.name.toLowerCase().endsWith('.mp3')
-        })
-        cb(null, filtered)
-      })
-    }
-  }
-}
-
-class Player {
-  constructor() {
-    this.process = null
-  }
-
-  play(path) {
-    this.process = spawn('afplay', [path])
-  }
-
-  stop() {
-    if (this.process) {
-      this.process.kill()
-      this.process = null
-    }
-  }
-}
-
-class Preview {
-  constructor() {
-    this.items = []
-    this.list = list.create({
-      items: this.items,
-      title: ''
-    })
-  }
-
-  view(width, height) {
-    return style().width(width).height(height).render(this.list.view())
-  }
-
-  update(msg) {
-    const [l, cmd] = this.list.update(msg)
-    this.list = l
-    return cmd
-  }
 }
 
 class App {
@@ -188,25 +131,33 @@ class App {
 
     const logo = style().foreground('#FF79C6').bold(true).render('♫ bare-tui-player')
     const version = style().foreground('#44475A').render('v1.0.0')
-    const headerNowPlaying = this.isPlaying && this.currentTrack
-      ? style().foreground('#6272A4').render('playing: ') + style().foreground('#00D7FF').render(this.currentTrack)
-      : style().foreground('#44475A').render('─'.repeat(Math.max(0, this.width - 24)))
+    const headerNowPlaying =
+      this.isPlaying && this.currentTrack
+        ? style().foreground('#6272A4').render('playing: ') +
+          style().foreground('#00D7FF').render(this.currentTrack)
+        : style()
+            .foreground('#44475A')
+            .render('─'.repeat(Math.max(0, this.width - 24)))
 
     const header = style()
       .border(style.borders.rounded)
       .borderForeground('#44475A')
       .width(this.width - 2)
       .render(
-        style.joinHorizontal(style.position.top,
-          logo, '  ', version, '   ', headerNowPlaying
-        )
+        style.joinHorizontal(style.position.top, logo, '  ', version, '   ', headerNowPlaying)
       )
 
-    const keys = style().foreground('#6272A4').render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
+    const keys = style()
+      .foreground('#6272A4')
+      .render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
 
-    const nowPlaying = this.isPlaying && this.currentTrack
-      ? style().foreground('#FF79C6').bold(true).render('♪ ' + this.currentTrack)
-      : style().foreground('#44475A').render('nothing playing')
+    const nowPlaying =
+      this.isPlaying && this.currentTrack
+        ? style()
+            .foreground('#FF79C6')
+            .bold(true)
+            .render('♪ ' + this.currentTrack)
+        : style().foreground('#44475A').render('nothing playing')
 
     const footer = style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
 
