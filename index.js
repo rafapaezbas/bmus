@@ -1,5 +1,12 @@
 const { join } = require('bare-path')
-const { Program, quit, key, filepicker, style, spinner } = require('@holepunchto/bare-tui')
+const {
+  Program,
+  quit,
+  key,
+  filepicker,
+  style,
+  spinner
+} = require('@holepunchto/bare-tui')
 const { filterMp3Files, Player, Preview, Playlist, createFoldersOnlyFs } = require('./lib/utils.js')
 
 const PANEL = {
@@ -49,6 +56,8 @@ class App {
       case 'filepicker.entries':
         this.currentDir = msg.dir
         this._setPreviewItems(msg.dir)
+        // the filepicker widget also needs this message to refresh
+        // its own internal entry list
         return this._updateFp(msg)
 
       case 'resize':
@@ -59,7 +68,8 @@ class App {
         return this._updateSpinner(msg)
 
       case 'key':
-        if (key.matches(msg, 'q', 'ctrl+c')) return [this, quit]
+        if (key.matches(msg, 'ctrl+c')) return [this, quit]
+        if (key.matches(msg, 'q') && this._activePanel() !== PANEL.PLAYLIST) return [this, quit]
         if (key.matches(msg, 'tab')) {
           this.selectedPanel++
           return [this, null]
@@ -80,11 +90,29 @@ class App {
           this._playSelected()
           return [this, null]
         }
+        if (key.matches(msg, 'a')) {
+          this._addSelectedToPlaylist()
+          return [this, null]
+        }
         return this.preview.update(msg)
+
+      case PANEL.PLAYLIST:
+        if (key.matches(msg, 'q')) {
+          this.playlist.removeSelected()
+          return [this, null]
+        }
+        return this.playlist.update(msg)
 
       default:
         return [this, null]
     }
+  }
+
+  _addSelectedToPlaylist() {
+    const track = this.preview.list.selectedItem()
+    if (!track) return
+
+    this.playlist.addTrack(track)
   }
 
   _activePanel() {
@@ -117,11 +145,6 @@ class App {
     this.preview.list.setItems(filterMp3Files(path))
   }
 
-  _setTracklistItems(items) {
-    this.playlist.items = items
-    this.playlist.list.setItems(items)
-  }
-
   _resize(width, height) {
     this.width = width
     this.height = height
@@ -141,6 +164,8 @@ class App {
   _contentHeight() {
     return this.height - BOTTOM_PADDING - 1
   }
+
+  // ---- view ----
 
   view() {
     const body = style.joinHorizontal(
@@ -233,14 +258,11 @@ class App {
   _renderFooter() {
     const keys = style()
       .foreground(COLORS.muted)
-      .render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
+      .render('  ↑/↓ move · ↵ play · a add to playlist · q remove/quit · tab switch')
 
     const nowPlaying =
       this.isPlaying && this.currentTrack
-        ? style()
-            .foreground(COLORS.pink)
-            .bold(true)
-            .render('♪ ' + this.currentTrack)
+        ? style().foreground(COLORS.pink).bold(true).render('♪ ' + this.currentTrack)
         : style().foreground(COLORS.border).render('nothing playing')
 
     return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
