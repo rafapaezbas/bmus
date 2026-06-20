@@ -9,11 +9,12 @@ const {
   // viewport,
   spinner
 } = require('@holepunchto/bare-tui')
-const { filterMp3Files, Player, Preview, createFoldersOnlyFs } = require('./lib/utils.js')
+const { filterMp3Files, Player, Preview, Playlist, createFoldersOnlyFs } = require('./lib/utils.js')
 
 const constants = {
   FP_PANEL: 0,
-  PREVIEW_PANEL: 1
+  PREVIEW_PANEL: 1,
+  PLAYLIST_PANEL: 2
 }
 
 class App {
@@ -24,10 +25,11 @@ class App {
     this.bottomPadding = 7
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
     this.preview = new Preview()
+    this.playlist = new Playlist()
     this.picked = null
     this.selectedPanel = 0
     this.debugMessage = 0
-    this.pannels = 2
+    this.pannels = 3
     this.spinner = spinner.create({ fps: 12 })
     this.currentDir = null
     this.isPlaying = false
@@ -55,6 +57,12 @@ class App {
     if (msg.type === 'resize') {
       this.width = msg.width
       this.height = msg.height
+      this.fp.width = this.width / 6
+      this.fp.height = this.height - this.bottomPadding - 1
+      this.preview.list.width = (this.width / 6) * 2 - 8
+      this.preview.list.height = this.height - this.bottomPadding - 1
+      this.playlist.list.width = (this.width / 6) * 2
+      this.playlist.list.height = this.height - this.bottomPadding - 1
       return [this, null]
     }
 
@@ -103,9 +111,15 @@ class App {
     this.preview.list.setItems(filterMp3Files(path))
   }
 
+  _setTracklistItems(items) {
+    this.playlist.items = items
+    this.playlist.list.setItems(items)
+  }
+
   view() {
     const isFilepanel = this.selectedPanel % this.pannels === constants.FP_PANEL
     const isPreviewPanel = this.selectedPanel % this.pannels === constants.PREVIEW_PANEL
+    const isPlaylistPanel = this.selectedPanel % this.pannels === constants.PLAYLIST_PANEL
 
     const fp = style()
       .border(style.borders.rounded)
@@ -119,7 +133,7 @@ class App {
       .border(style.borders.rounded)
       .borderForeground(isPreviewPanel ? '#00D7FF' : '#44475A')
       .padding(0, 1)
-      .width((this.width / 6) * 5 - 8)
+      .width((this.width / 6) * 2 - 8)
       .height(this.height - this.bottomPadding)
       .render(
         this.preview.list.items.length
@@ -127,7 +141,15 @@ class App {
           : style().foreground('#6272A4').italic(true).render('No mp3 files here')
       )
 
-    const body = style.joinHorizontal(style.position.top, fp, ' ', preview)
+    const playlist = style()
+      .border(style.borders.rounded)
+      .borderForeground(isPlaylistPanel ? '#00D7FF' : '#44475A')
+      .padding(0, 1)
+      .width((this.width / 6) * 3 - 5)
+      .height(this.height - this.bottomPadding)
+      .render(this.playlist.view((this.width / 6) * 3 - 6, this.height - this.bottomPadding))
+
+    const body = style.joinHorizontal(style.position.top, fp, ' ', preview, ' ', playlist)
 
     const logo = style().foreground('#FF79C6').bold(true).render('♫ bare-tui-player')
     const version = style().foreground('#44475A').render('v1.0.0')
