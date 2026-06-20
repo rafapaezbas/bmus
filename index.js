@@ -1,35 +1,33 @@
 const { join } = require('bare-path')
-const {
-  Program,
-  // sequence,
-  quit,
-  key,
-  filepicker,
-  style,
-  // viewport,
-  spinner
-} = require('@holepunchto/bare-tui')
+const { Program, quit, key, filepicker, style, spinner } = require('@holepunchto/bare-tui')
 const { filterMp3Files, Player, Preview, Playlist, createFoldersOnlyFs } = require('./lib/utils.js')
 
-const constants = {
-  FP_PANEL: 0,
-  PREVIEW_PANEL: 1,
-  PLAYLIST_PANEL: 2
+const PANEL = {
+  FILEPICKER: 0,
+  PREVIEW: 1,
+  PLAYLIST: 2
 }
+const PANEL_COUNT = 3
+
+const COLORS = {
+  accent: '#00D7FF',
+  border: '#44475A',
+  muted: '#6272A4',
+  pink: '#FF79C6'
+}
+
+const BOTTOM_PADDING = 7
 
 class App {
   constructor() {
     this.player = new Player()
     this.width = 80
     this.height = 24
-    this.bottomPadding = 7
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
     this.preview = new Preview()
     this.playlist = new Playlist()
     this.picked = null
-    this.selectedPanel = 0
-    this.debugMessage = 0
-    this.pannels = 3
+    this.selectedPanel = PANEL.FILEPICKER
     this.spinner = spinner.create({ fps: 12 })
     this.currentDir = null
     this.isPlaying = false
@@ -40,59 +38,67 @@ class App {
     return this.fp.init()
   }
 
+  // ---- update ----
+
   update(msg) {
-    this.debugMessage = JSON.stringify(msg)
-    if (msg.type === 'filepicker.select') {
-      this.picked = msg.path
-      return [this, null]
-    }
-    if (msg.type === 'filepicker.entries') {
-      this.currentDir = msg.dir
-      this._setPreviewItems(msg.dir)
-    }
-    if (msg.type === 'key' && key.matches(msg, 'q', 'ctrl+c')) {
-      return [this, quit]
-    }
-
-    if (msg.type === 'resize') {
-      this.width = msg.width
-      this.height = msg.height
-      this.fp.width = this.width / 6
-      this.fp.height = this.height - this.bottomPadding - 1
-      this.preview.list.width = (this.width / 6) * 2 - 8
-      this.preview.list.height = this.height - this.bottomPadding - 1
-      this.playlist.list.width = (this.width / 6) * 2
-      this.playlist.list.height = this.height - this.bottomPadding - 1
-      return [this, null]
-    }
-
-    if (msg.type === 'key' && key.matches(msg, 'tab')) {
-      this.selectedPanel++
-      return [this, null]
-    }
-
-    if (msg.type === 'spinner.tick') {
-      return this._updateSpinner(msg)
-    }
-
-    if (this.selectedPanel % this.pannels === constants.FP_PANEL) {
-      return this._updateFp(msg)
-    }
-
-    if (this.selectedPanel % this.pannels === constants.PREVIEW_PANEL) {
-      if (key.matches(msg, 'enter')) {
-        const path = join(this.currentDir, this.preview.list.selectedItem())
-        this.isPlaying = true
-        this.currentTrack = this.preview.list.selectedItem()
-        this.debugMessage = '♪ ' + this.currentTrack
-        this.player.stop()
-        this.player.play(path)
+    switch (msg.type) {
+      case 'filepicker.select':
+        this.picked = msg.path
         return [this, null]
-      }
-      return this.preview.update(msg)
+
+      case 'filepicker.entries':
+        this.currentDir = msg.dir
+        this._setPreviewItems(msg.dir)
+        return this._updateFp(msg)
+
+      case 'resize':
+        this._resize(msg.width, msg.height)
+        return [this, null]
+
+      case 'spinner.tick':
+        return this._updateSpinner(msg)
+
+      case 'key':
+        if (key.matches(msg, 'q', 'ctrl+c')) return [this, quit]
+        if (key.matches(msg, 'tab')) {
+          this.selectedPanel++
+          return [this, null]
+        }
+        break
     }
 
-    return [this, null]
+    return this._updateActivePanel(msg)
+  }
+
+  _updateActivePanel(msg) {
+    switch (this._activePanel()) {
+      case PANEL.FILEPICKER:
+        return this._updateFp(msg)
+
+      case PANEL.PREVIEW:
+        if (key.matches(msg, 'enter')) {
+          this._playSelected()
+          return [this, null]
+        }
+        return this.preview.update(msg)
+
+      default:
+        return [this, null]
+    }
+  }
+
+  _activePanel() {
+    return this.selectedPanel % PANEL_COUNT
+  }
+
+  _playSelected() {
+    const track = this.preview.list.selectedItem()
+    const path = join(this.currentDir, track)
+
+    this.isPlaying = true
+    this.currentTrack = track
+    this.player.stop()
+    this.player.play(path)
   }
 
   _updateFp(msg) {
@@ -116,74 +122,128 @@ class App {
     this.playlist.list.setItems(items)
   }
 
-  view() {
-    const isFilepanel = this.selectedPanel % this.pannels === constants.FP_PANEL
-    const isPreviewPanel = this.selectedPanel % this.pannels === constants.PREVIEW_PANEL
-    const isPlaylistPanel = this.selectedPanel % this.pannels === constants.PLAYLIST_PANEL
+  _resize(width, height) {
+    this.width = width
+    this.height = height
 
-    const fp = style()
+    const panelHeight = this._contentHeight()
+
+    this.fp.width = width / 6
+    this.fp.height = panelHeight
+
+    this.preview.list.width = (width / 6) * 2 - 8
+    this.preview.list.height = panelHeight
+
+    this.playlist.list.width = (width / 6) * 2
+    this.playlist.list.height = panelHeight
+  }
+
+  _contentHeight() {
+    return this.height - BOTTOM_PADDING - 1
+  }
+
+  view() {
+    const body = style.joinHorizontal(
+      style.position.top,
+      this._renderFilepicker(),
+      ' ',
+      this._renderPreview(),
+      ' ',
+      this._renderPlaylist()
+    )
+
+    return style.joinVertical(
+      style.position.left,
+      this._renderHeader(),
+      body,
+      ' ',
+      this._renderFooter()
+    )
+  }
+
+  _panelBorderColor(panel) {
+    return this._activePanel() === panel ? COLORS.accent : COLORS.border
+  }
+
+  _renderFilepicker() {
+    return style()
       .border(style.borders.rounded)
-      .borderForeground(isFilepanel ? '#00D7FF' : '#44475A')
+      .borderForeground(this._panelBorderColor(PANEL.FILEPICKER))
       .padding(0, 1)
       .width(this.width / 6)
-      .height(this.height - this.bottomPadding)
+      .height(this.height - BOTTOM_PADDING)
       .render(this.fp.view())
+  }
 
-    const preview = style()
+  _renderPreview() {
+    const width = (this.width / 6) * 2 - 8
+    const height = this.height - BOTTOM_PADDING
+
+    const content = this.preview.list.items.length
+      ? this.preview.view(this.width / 2, height)
+      : style().foreground(COLORS.muted).italic(true).render('No mp3 files here')
+
+    return style()
       .border(style.borders.rounded)
-      .borderForeground(isPreviewPanel ? '#00D7FF' : '#44475A')
+      .borderForeground(this._panelBorderColor(PANEL.PREVIEW))
       .padding(0, 1)
-      .width((this.width / 6) * 2 - 8)
-      .height(this.height - this.bottomPadding)
-      .render(
-        this.preview.list.items.length
-          ? this.preview.view(this.width / 2, this.height - this.bottomPadding)
-          : style().foreground('#6272A4').italic(true).render('No mp3 files here')
-      )
+      .width(width)
+      .height(height)
+      .render(content)
+  }
 
-    const playlist = style()
+  _renderPlaylist() {
+    const width = (this.width / 6) * 3 - 5
+    const height = this.height - BOTTOM_PADDING
+
+    return style()
       .border(style.borders.rounded)
-      .borderForeground(isPlaylistPanel ? '#00D7FF' : '#44475A')
+      .borderForeground(this._panelBorderColor(PANEL.PLAYLIST))
       .padding(0, 1)
-      .width((this.width / 6) * 3 - 5)
-      .height(this.height - this.bottomPadding)
-      .render(this.playlist.view((this.width / 6) * 3 - 6, this.height - this.bottomPadding))
+      .width(width)
+      .height(height)
+      .render(this.playlist.view((this.width / 6) * 3 - 6, height))
+  }
 
-    const body = style.joinHorizontal(style.position.top, fp, ' ', preview, ' ', playlist)
+  _renderHeader() {
+    const logo = style().foreground(COLORS.pink).bold(true).render('♫ bare-tui-player')
+    const version = style().foreground(COLORS.border).render('v1.0.0')
+    const nowPlaying = this._renderHeaderNowPlaying()
 
-    const logo = style().foreground('#FF79C6').bold(true).render('♫ bare-tui-player')
-    const version = style().foreground('#44475A').render('v1.0.0')
-    const headerNowPlaying =
-      this.isPlaying && this.currentTrack
-        ? style().foreground('#6272A4').render('playing: ') +
-          style().foreground('#00D7FF').render(this.currentTrack)
-        : style()
-            .foreground('#44475A')
-            .render('─'.repeat(Math.max(0, this.width - 24)))
-
-    const header = style()
+    return style()
       .border(style.borders.rounded)
-      .borderForeground('#44475A')
+      .borderForeground(COLORS.border)
       .width(this.width - 2)
-      .render(
-        style.joinHorizontal(style.position.top, logo, '  ', version, '   ', headerNowPlaying)
-      )
+      .render(style.joinHorizontal(style.position.top, logo, '  ', version, '   ', nowPlaying))
+  }
 
+  _renderHeaderNowPlaying() {
+    if (this.isPlaying && this.currentTrack) {
+      return (
+        style().foreground(COLORS.muted).render('playing: ') +
+        style().foreground(COLORS.accent).render(this.currentTrack)
+      )
+    }
+
+    return style()
+      .foreground(COLORS.border)
+      .render('─'.repeat(Math.max(0, this.width - 24)))
+  }
+
+  _renderFooter() {
     const keys = style()
-      .foreground('#6272A4')
+      .foreground(COLORS.muted)
       .render('  ↑/↓ move · ↵/→ open · ⌫/← up · tab switch · q quit')
 
     const nowPlaying =
       this.isPlaying && this.currentTrack
         ? style()
-            .foreground('#FF79C6')
+            .foreground(COLORS.pink)
             .bold(true)
             .render('♪ ' + this.currentTrack)
-        : style().foreground('#44475A').render('nothing playing')
+        : style().foreground(COLORS.border).render('nothing playing')
 
-    const footer = style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
-
-    return style.joinVertical(style.position.left, header, body, ' ', footer)
+    return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
   }
 }
 
