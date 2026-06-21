@@ -65,7 +65,10 @@ class App {
         return [this, null]
 
       case 'key':
-        if (key.matches(msg, 'ctrl+c')) return [this, quit]
+        if (key.matches(msg, 'ctrl+c')) {
+          this.player.stop()
+          return [this, quit]
+        }
         if (key.matches(msg, 'tab')) this.selectedPanel++
         return this._updateActivePanel(msg)
     }
@@ -81,7 +84,7 @@ class App {
         if (key.matches(msg, 'a')) {
           this._addSelectedToPlaylist()
         }
-        return this.preview.update(msg)
+        return [this, this.preview.update(msg)]
 
       case PANEL.PLAYLIST:
         if (key.matches(msg, 'enter')) {
@@ -90,7 +93,7 @@ class App {
         if (key.matches(msg, 'q')) {
           this.playlist.removeSelected()
         }
-        return this.playlist.update(msg)
+        return [this, this.playlist.update(msg)]
 
       case PANEL.TEXT_INPUT:
         if (key.matches(msg, 'enter')) {
