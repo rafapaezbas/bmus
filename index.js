@@ -40,7 +40,7 @@ class App {
     this.currentDir = null
     this.previewTrackNames = []
     this.isPlaying = false
-    this.currentTrack = null
+    this.currentTrack = { label: null, path: null }
   }
 
   init() {
@@ -76,6 +76,7 @@ class App {
 
   _updateActivePanel(msg) {
     if (this.textInputFocus) return this._updateTextInput(msg)
+
     switch (this._activePanel()) {
       case PANEL.FILEPICKER:
         return this._updateFp(msg)
@@ -89,6 +90,9 @@ class App {
       case PANEL.PLAYLIST:
         if (key.matches(msg, 'enter')) {
           this._playSelectedFromPlaylist()
+        }
+        if (key.matches(msg, 'n')) {
+          this._playNext()
         }
         if (key.matches(msg, 'q')) {
           this.playlist.removeSelected()
@@ -121,11 +125,6 @@ class App {
   _selectedPreviewTrackName() {
     const selected = this.preview.list.selectedItem()
     if (!selected) return null
-
-    if (this.isPlaying && selected !== this.currentTrack && selected.endsWith(this.currentTrack)) {
-      return this.currentTrack
-    }
-
     return selected
   }
 
@@ -136,16 +135,20 @@ class App {
   _playSelectedFromPlaylist() {
     const path = this.playlist.list.selectedItem()
     if (!path) return
-
-    this._play(path, basename(path))
+    this._play(path)
   }
 
-  _play(path, label) {
+  _play(path) {
     this.isPlaying = true
-    this.currentTrack = label
-    this.player.stop()
+    this.currentTrack = { label: basename(path), path }
     this.player.play(path)
-    this._refreshPreviewDisplay()
+  }
+
+  _playNext() {
+    const nextTrackIndex =
+      (this.playlist.items.indexOf(this.currentTrack.path) + 1) % this.playlist.items.length
+    const nextTrack = this.playlist.items[nextTrackIndex]
+    this._play(nextTrack)
   }
 
   _updateFp(msg) {
@@ -163,7 +166,7 @@ class App {
     const names = this.previewTrackNames || []
 
     const display = names.map((name) =>
-      this.isPlaying && name === this.currentTrack ? `♪ ${name}` : name
+      this.isPlaying && name === this.currentTrack.label ? `♪ ${name}` : name
     )
 
     this.preview.list.setItems(display)
@@ -297,10 +300,10 @@ class App {
   }
 
   _renderHeaderNowPlaying() {
-    if (this.isPlaying && this.currentTrack) {
+    if (this.isPlaying && this.currentTrack.label) {
       return (
         style().foreground(COLORS.muted).render('playing: ') +
-        style().foreground(COLORS.accent).render(this.currentTrack)
+        style().foreground(COLORS.accent).render(this.currentTrack.label)
       )
     }
 
@@ -315,11 +318,11 @@ class App {
       .render('  ' + this._footerHint())
 
     const nowPlaying =
-      this.isPlaying && this.currentTrack
+      this.isPlaying && this.currentTrack.label
         ? style()
             .foreground(COLORS.pink)
             .bold(true)
-            .render('♪ ' + this.currentTrack)
+            .render('♪ ' + this.currentTrack.label)
         : style().foreground(COLORS.border).render('nothing playing')
 
     return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
@@ -332,7 +335,7 @@ class App {
       case PANEL.PREVIEW:
         return '↑/↓ move · a add to playlist · tab switch'
       case PANEL.PLAYLIST:
-        return '↑/↓ move · ↵ play · q remove · tab switch · ctrl+c quit'
+        return '↑/↓ move · ↵ play · q remove · n next · tab switch · ctrl+c quit'
       default:
         return 'tab switch'
     }
