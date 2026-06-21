@@ -1,5 +1,5 @@
 const { join, basename } = require('bare-path')
-const { Program, quit, key, filepicker, style, spinner } = require('@holepunchto/bare-tui')
+const { Program, quit, key, filepicker, style } = require('@holepunchto/bare-tui')
 const {
   filterMp3Files,
   Player,
@@ -37,12 +37,10 @@ class App {
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
     this.picked = null
     this.selectedPanel = PANEL.FILEPICKER
-    this.spinner = spinner.create({ fps: 12 })
     this.currentDir = null
     this.previewTrackNames = []
     this.isPlaying = false
     this.currentTrack = null
-    this.textInputFocus = false
   }
 
   init() {
@@ -60,16 +58,11 @@ class App {
       case 'filepicker.entries':
         this.currentDir = msg.dir
         this._setPreviewItems(msg.dir)
-        // the filepicker widget also needs this message to refresh
-        // its own internal entry list
         return this._updateFp(msg)
 
       case 'resize':
         this._resize(msg.width, msg.height)
         return [this, null]
-
-      case 'spinner.tick':
-        return this._updateSpinner(msg)
 
       case 'key':
         if (key.matches(msg, 'ctrl+c')) return [this, quit]
@@ -158,13 +151,6 @@ class App {
     return [this, cmd]
   }
 
-  _updateSpinner(msg) {
-    const [s, cmd] = this.spinner.update(msg)
-    this.spinner = s
-    this._refreshPreviewDisplay()
-    return [this, cmd]
-  }
-
   _setPreviewItems(path) {
     this.previewTrackNames = filterMp3Files(path)
     this._refreshPreviewDisplay()
@@ -217,7 +203,6 @@ class App {
       this._renderHeader(),
       body,
       this._renderTextInput(),
-      ' ',
       this._renderFooter()
     )
   }
