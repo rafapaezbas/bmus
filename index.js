@@ -178,7 +178,7 @@ class App {
     this.preview.list.width = (width / 6) * 2 - 8
     this.preview.list.height = panelHeight
 
-    this.playlist.list.width = (width / 6) * 2
+    this.playlist.list.width = (width / 6) * 3
     this.playlist.list.height = panelHeight
   }
 
