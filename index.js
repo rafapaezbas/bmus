@@ -1,20 +1,21 @@
-const { join } = require('bare-path')
+const { join, basename } = require('bare-path')
+const { Program, quit, key, filepicker, style, spinner } = require('@holepunchto/bare-tui')
 const {
-  Program,
-  quit,
-  key,
-  filepicker,
-  style,
-  spinner
-} = require('@holepunchto/bare-tui')
-const { filterMp3Files, Player, Preview, Playlist, createFoldersOnlyFs } = require('./lib/utils.js')
+  filterMp3Files,
+  Player,
+  Preview,
+  Playlist,
+  createFoldersOnlyFs,
+  TextInput
+} = require('./lib/utils.js')
 
 const PANEL = {
   FILEPICKER: 0,
   PREVIEW: 1,
-  PLAYLIST: 2
+  PLAYLIST: 2,
+  TEXT_INPUT: 3
 }
-const PANEL_COUNT = 3
+const PANEL_COUNT = 4
 
 const COLORS = {
   accent: '#00D7FF',
@@ -23,22 +24,25 @@ const COLORS = {
   pink: '#FF79C6'
 }
 
-const BOTTOM_PADDING = 7
+const BOTTOM_PADDING = 10
 
 class App {
   constructor() {
     this.player = new Player()
+    this.preview = new Preview()
+    this.playlist = new Playlist()
+    this.textInput = new TextInput()
     this.width = 80
     this.height = 24
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
-    this.preview = new Preview()
-    this.playlist = new Playlist()
     this.picked = null
     this.selectedPanel = PANEL.FILEPICKER
     this.spinner = spinner.create({ fps: 12 })
     this.currentDir = null
+    this.previewTrackNames = []
     this.isPlaying = false
     this.currentTrack = null
+    this.textInputFocus = false
   }
 
   init() {
@@ -69,64 +73,83 @@ class App {
 
       case 'key':
         if (key.matches(msg, 'ctrl+c')) return [this, quit]
-        if (key.matches(msg, 'q') && this._activePanel() !== PANEL.PLAYLIST) return [this, quit]
-        if (key.matches(msg, 'tab')) {
-          this.selectedPanel++
-          return [this, null]
-        }
-        break
+        if (key.matches(msg, 'tab')) this.selectedPanel++
+        return this._updateActivePanel(msg)
     }
-
-    return this._updateActivePanel(msg)
   }
 
   _updateActivePanel(msg) {
+    if (this.textInputFocus) return this._updateTextInput(msg)
     switch (this._activePanel()) {
       case PANEL.FILEPICKER:
         return this._updateFp(msg)
 
       case PANEL.PREVIEW:
-        if (key.matches(msg, 'enter')) {
-          this._playSelected()
-          return [this, null]
-        }
         if (key.matches(msg, 'a')) {
           this._addSelectedToPlaylist()
-          return [this, null]
         }
         return this.preview.update(msg)
 
       case PANEL.PLAYLIST:
+        if (key.matches(msg, 'enter')) {
+          this._playSelectedFromPlaylist()
+        }
         if (key.matches(msg, 'q')) {
           this.playlist.removeSelected()
-          return [this, null]
         }
         return this.playlist.update(msg)
+
+      case PANEL.TEXT_INPUT:
+        if (key.matches(msg, 'enter')) {
+          this.textInput.submit()
+        }
+        return this.textInput.update(msg)
 
       default:
         return [this, null]
     }
   }
 
+  _updateTextInput(msg) {
+    return this.textInput.update(msg)
+  }
+
   _addSelectedToPlaylist() {
-    const track = this.preview.list.selectedItem()
+    const track = this._selectedPreviewTrackName()
     if (!track) return
 
-    this.playlist.addTrack(track)
+    const path = join(this.currentDir, track)
+    this.playlist.addTrack(path)
+  }
+
+  _selectedPreviewTrackName() {
+    const selected = this.preview.list.selectedItem()
+    if (!selected) return null
+
+    if (this.isPlaying && selected !== this.currentTrack && selected.endsWith(this.currentTrack)) {
+      return this.currentTrack
+    }
+
+    return selected
   }
 
   _activePanel() {
     return this.selectedPanel % PANEL_COUNT
   }
 
-  _playSelected() {
-    const track = this.preview.list.selectedItem()
-    const path = join(this.currentDir, track)
+  _playSelectedFromPlaylist() {
+    const path = this.playlist.list.selectedItem()
+    if (!path) return
 
+    this._play(path, basename(path))
+  }
+
+  _play(path, label) {
     this.isPlaying = true
-    this.currentTrack = track
+    this.currentTrack = label
     this.player.stop()
     this.player.play(path)
+    this._refreshPreviewDisplay()
   }
 
   _updateFp(msg) {
@@ -138,11 +161,23 @@ class App {
   _updateSpinner(msg) {
     const [s, cmd] = this.spinner.update(msg)
     this.spinner = s
+    this._refreshPreviewDisplay()
     return [this, cmd]
   }
 
   _setPreviewItems(path) {
-    this.preview.list.setItems(filterMp3Files(path))
+    this.previewTrackNames = filterMp3Files(path)
+    this._refreshPreviewDisplay()
+  }
+
+  _refreshPreviewDisplay() {
+    const names = this.previewTrackNames || []
+
+    const display = names.map((name) =>
+      this.isPlaying && name === this.currentTrack ? `♪ ${name}` : name
+    )
+
+    this.preview.list.setItems(display)
   }
 
   _resize(width, height) {
@@ -152,13 +187,13 @@ class App {
     const panelHeight = this._contentHeight()
 
     this.fp.width = width / 6
-    this.fp.height = panelHeight
+    this.fp.height = panelHeight - 1
 
     this.preview.list.width = (width / 6) * 2 - 8
     this.preview.list.height = panelHeight
 
     this.playlist.list.width = (width / 6) * 2
-    this.playlist.list.height = panelHeight - 2
+    this.playlist.list.height = panelHeight
   }
 
   _contentHeight() {
@@ -181,6 +216,7 @@ class App {
       style.position.left,
       this._renderHeader(),
       body,
+      this._renderTextInput(),
       ' ',
       this._renderFooter()
     )
@@ -190,44 +226,74 @@ class App {
     return this._activePanel() === panel ? COLORS.accent : COLORS.border
   }
 
-  _renderFilepicker() {
+  _sectionLabel(text, panel) {
+    const color = this._panelBorderColor(panel)
     return style()
+      .foreground(color)
+      .bold(true)
+      .render(' ' + text)
+  }
+
+  _renderFilepicker() {
+    const box = style()
       .border(style.borders.rounded)
       .borderForeground(this._panelBorderColor(PANEL.FILEPICKER))
       .padding(0, 1)
       .width(this.width / 6)
-      .height(this.height - BOTTOM_PADDING)
+      .height(this.height - BOTTOM_PADDING - 1)
       .render(this.fp.view())
+
+    return style.joinVertical(
+      style.position.left,
+      this._sectionLabel('Library', PANEL.FILEPICKER),
+      box
+    )
   }
 
   _renderPreview() {
     const width = (this.width / 6) * 2 - 8
-    const height = this.height - BOTTOM_PADDING
+    const height = this.height - BOTTOM_PADDING - 1
 
     const content = this.preview.list.items.length
       ? this.preview.view(this.width / 2, height)
       : style().foreground(COLORS.muted).italic(true).render('No mp3 files here')
 
-    return style()
+    const box = style()
       .border(style.borders.rounded)
       .borderForeground(this._panelBorderColor(PANEL.PREVIEW))
       .padding(0, 1)
       .width(width)
       .height(height)
       .render(content)
+
+    const label = `Track${this.previewTrackNames.length ? ` (${this.previewTrackNames.length})` : ''}`
+
+    return style.joinVertical(style.position.left, this._sectionLabel(label, PANEL.PREVIEW), box)
   }
 
   _renderPlaylist() {
     const width = (this.width / 6) * 3 - 5
-    const height = this.height - BOTTOM_PADDING
+    const height = this.height - BOTTOM_PADDING - 1
 
-    return style()
+    const box = style()
       .border(style.borders.rounded)
       .borderForeground(this._panelBorderColor(PANEL.PLAYLIST))
       .padding(0, 1)
       .width(width)
       .height(height)
       .render(this.playlist.view((this.width / 6) * 3 - 6, height))
+
+    const label = `Queue${this.playlist.items.length ? ` (${this.playlist.items.length})` : ''}`
+
+    return style.joinVertical(style.position.left, this._sectionLabel(label, PANEL.PLAYLIST), box)
+  }
+
+  _renderTextInput() {
+    return style()
+      .border(style.borders.rounded)
+      .borderForeground(this._panelBorderColor(PANEL.TEXT_INPUT))
+      .width(this.width - 2)
+      .render(this.textInput.view())
   }
 
   _renderHeader() {
@@ -258,14 +324,30 @@ class App {
   _renderFooter() {
     const keys = style()
       .foreground(COLORS.muted)
-      .render('  ↑/↓ move · ↵ play · a add to playlist · q remove/quit · tab switch')
+      .render('  ' + this._footerHint())
 
     const nowPlaying =
       this.isPlaying && this.currentTrack
-        ? style().foreground(COLORS.pink).bold(true).render('♪ ' + this.currentTrack)
+        ? style()
+            .foreground(COLORS.pink)
+            .bold(true)
+            .render('♪ ' + this.currentTrack)
         : style().foreground(COLORS.border).render('nothing playing')
 
     return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
+  }
+
+  _footerHint() {
+    switch (this._activePanel()) {
+      case PANEL.FILEPICKER:
+        return '↑/↓ move · ↵/→ open · ⌫/← up · tab switch'
+      case PANEL.PREVIEW:
+        return '↑/↓ move · a add to playlist · tab switch'
+      case PANEL.PLAYLIST:
+        return '↑/↓ move · ↵ play · q remove · tab switch · ctrl+c quit'
+      default:
+        return 'tab switch'
+    }
   }
 }
 
