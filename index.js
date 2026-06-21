@@ -32,8 +32,8 @@ class App {
     this.preview = new Preview()
     this.playlist = new Playlist()
     this.textInput = new TextInput()
-    this.width = 80
-    this.height = 24
+    this.width = undefined
+    this.height = undefined
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
     this.picked = null
     this.selectedPanel = PANEL.FILEPICKER
@@ -75,8 +75,6 @@ class App {
   }
 
   _updateActivePanel(msg) {
-    if (this.textInputFocus) return this._updateTextInput(msg)
-
     switch (this._activePanel()) {
       case PANEL.FILEPICKER:
         return this._updateFp(msg)
@@ -108,10 +106,6 @@ class App {
       default:
         return [this, null]
     }
-  }
-
-  _updateTextInput(msg) {
-    return this.textInput.update(msg)
   }
 
   _addSelectedToPlaylist() {
@@ -192,22 +186,32 @@ class App {
     return this.height - BOTTOM_PADDING - 1
   }
 
+  _renderBody() {
+    const menu = this.textInput.input.menuView()
+    let menuLines = 0
+    if (menu) {
+      menuLines = menu.split('\n').length
+    }
+    return style()
+      .height(this.height - BOTTOM_PADDING + 2 - menuLines)
+      .render(
+        style.joinHorizontal(
+          style.position.top,
+          ' ',
+          this._renderFilepicker(),
+          this._renderPreview(),
+          this._renderPlaylist()
+        )
+      )
+  }
+
   // ---- view ----
 
   view() {
-    const body = style.joinHorizontal(
-      style.position.top,
-      this._renderFilepicker(),
-      ' ',
-      this._renderPreview(),
-      ' ',
-      this._renderPlaylist()
-    )
-
     return style.joinVertical(
       style.position.left,
       this._renderHeader(),
-      body,
+      this._renderBody(),
       this._renderTextInput(),
       this._renderFooter()
     )
