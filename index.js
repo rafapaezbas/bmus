@@ -41,6 +41,11 @@ class App {
     this.previewTrackNames = []
     this.isPlaying = false
     this.currentTrack = { label: null, path: null }
+    this.debug = ''
+
+    this.player.on('stop', ({ signal }) => {
+      if (signal !== 'SIGTERM') this._playNext()
+    })
   }
 
   init() {
@@ -329,7 +334,7 @@ class App {
             .render('♪ ' + this.currentTrack.label)
         : style().foreground(COLORS.border).render('nothing playing')
 
-    return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying)
+    return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying, ' ', this.debug)
   }
 
   _footerHint() {
