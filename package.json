@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write . && lunte --fix .",
-    "lint": "prettier --check . && lunte"
+    "lint": "prettier --check . && lunte",
+    "make": "npx bare-build --standalone --base . --name bare-tui-player --host darwin-arm64 --out out/make index.js"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +18,7 @@
     "bare-subprocess": "^6.1.0"
   },
   "devDependencies": {
+    "bare-build": "^1.0.2",
     "lunte": "^1.8.0",
     "prettier": "^3.8.3",
     "prettier-config-holepunch": "^2.0.0"
