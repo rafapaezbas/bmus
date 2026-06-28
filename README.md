@@ -2,13 +2,8 @@
 
 A lightweight terminal music player for mp3 files, built on the [`bare`](https://github.com/holepunch/bare) runtime and [`bare-tui`](https://github.com/holepunchto/bare-tui).
 
-## Features
+<img width="3356" height="2036" alt="image" src="https://github.com/user-attachments/assets/2781efaa-e822-4b62-99e4-70cdda3b1b1e" />
 
-- Browse your filesystem and preview mp3 files in any folder
-- Queue tracks into a playlist and play them in order
-- Natural sort order for tracks (e.g. `track2` before `track10`)
-- Keyboard-driven interface with panel navigation
-- Now playing indicator in the header and footer
 
 ## Installation
 
