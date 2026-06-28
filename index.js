@@ -9,6 +9,8 @@ const {
   TextInput
 } = require('./lib/utils.js')
 
+global.debug = ''
+
 const PANEL = {
   FILEPICKER: 0,
   PREVIEW: 1,
@@ -74,7 +76,14 @@ class App {
           this.player.stop()
           return [this, quit]
         }
-        if (key.matches(msg, 'tab')) this.selectedPanel++
+        if (key.matches(msg, 'tab') && !key.matches(msg, 'shift+tab')) this.selectedPanel++
+        if (key.matches(msg, 'shift+tab')) {
+          if (this.selectedPanel === 0) {
+            this.selectedPanel = PANEL_COUNT
+          } else {
+            this.selectedPanel--
+          }
+        }
         return this._updateActivePanel(msg)
     }
   }
@@ -104,7 +113,7 @@ class App {
 
       case PANEL.TEXT_INPUT:
         if (key.matches(msg, 'enter')) {
-          this.textInput.submit()
+          this.textInput.submit(msg)
         }
         return this.textInput.update(msg)
 
@@ -334,7 +343,7 @@ class App {
             .render('♪ ' + this.currentTrack.label)
         : style().foreground(COLORS.border).render('nothing playing')
 
-    return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying, ' ', this.debug)
+    return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying, ' ', global.debug)
   }
 
   _footerHint() {
