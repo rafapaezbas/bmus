@@ -300,7 +300,7 @@ class App {
   }
 
   _renderHeader() {
-    const logo = style().foreground(COLORS.pink).bold(true).render('♫ bare-tui-player')
+    const logo = style().foreground(COLORS.pink).bold(true).render('♫ bmus')
     const version = style().foreground(COLORS.border).render('v1.0.0')
     const nowPlaying = this._renderHeaderNowPlaying()
 

@@ -1,12 +1,12 @@
 {
-  "name": "bare-tui-player",
+  "name": "bmus",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write . && lunte --fix .",
     "lint": "prettier --check . && lunte",
-    "make": "npx bare-build --standalone --base . --name bare-tui-player --host darwin-arm64 --out out/make index.js"
+    "make": "npx bare-build --standalone --base . --name bmus --host darwin-arm64 --out out/make index.js"
   },
   "keywords": [],
   "author": "",
