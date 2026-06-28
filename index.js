@@ -31,9 +31,9 @@ const BOTTOM_PADDING = 10
 class App {
   constructor() {
     this.player = new Player()
-    this.preview = new Preview()
-    this.playlist = new Playlist()
-    this.textInput = new TextInput()
+    this.preview = new Preview(this)
+    this.playlist = new Playlist(this)
+    this.textInput = new TextInput(this)
     this.width = undefined
     this.height = undefined
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
@@ -48,6 +48,8 @@ class App {
     this.player.on('stop', ({ signal }) => {
       if (signal !== 'SIGTERM') this._playNext()
     })
+
+    this._registerCommands()
   }
 
   init() {
@@ -102,6 +104,7 @@ class App {
       case PANEL.PLAYLIST:
         if (key.matches(msg, 'enter')) {
           this._playSelectedFromPlaylist()
+          this.playlist.refresh()
         }
         if (key.matches(msg, 'n')) {
           this._playNext()
@@ -141,8 +144,9 @@ class App {
   }
 
   _playSelectedFromPlaylist() {
-    const path = this.playlist.list.selectedItem()
+    let path = this.playlist.list.selectedItem()
     if (!path) return
+    if (path.startsWith('♪ ')) path = path.substring(2)
     this._play(path)
   }
 
@@ -166,18 +170,8 @@ class App {
   }
 
   _setPreviewItems(path) {
-    this.previewTrackNames = filterMp3Files(path)
-    this._refreshPreviewDisplay()
-  }
-
-  _refreshPreviewDisplay() {
-    const names = this.previewTrackNames || []
-
-    const display = names.map((name) =>
-      this.isPlaying && name === this.currentTrack.label ? `♪ ${name}` : name
-    )
-
-    this.preview.list.setItems(display)
+    this.preview.items = filterMp3Files(path)
+    this.preview.refresh()
   }
 
   _resize(width, height) {
@@ -328,6 +322,18 @@ class App {
     return style()
       .foreground(COLORS.border)
       .render('─'.repeat(Math.max(0, this.width - 24)))
+  }
+
+  _registerCommands() {
+    this.textInput.registerCommand('add-all', () => {
+      this.preview.items.forEach((item) => {
+        const path = join(this.currentDir, item)
+        this.playlist.addTrack(path)
+      })
+    })
+    this.textInput.registerCommand('clear', () => {
+      this.playlist.clear()
+    })
   }
 
   _renderFooter() {
