@@ -43,6 +43,7 @@ class App {
     this.currentDir = null
     this.previewTrackNames = []
     this.isPlaying = false
+    this.random = false
     this.currentTrack = { label: null, path: null }
     this.debug = ''
 
@@ -113,6 +114,9 @@ class App {
         if (key.matches(msg, 'q')) {
           this.playlist.removeSelected()
         }
+        if (key.matches(msg, 'r')) {
+          this.random = !this.random
+        }
         return [this, this.playlist.update(msg)]
 
       case PANEL.TEXT_INPUT:
@@ -158,8 +162,20 @@ class App {
   }
 
   _playNext() {
-    const nextTrackIndex =
-      (this.playlist.items.indexOf(this.currentTrack.path) + 1) % this.playlist.items.length
+    let randomIndex = -1
+    if (this.playlist.items.length > 1) {
+      while (
+        randomIndex === -1 ||
+        randomIndex === this.playlist.items.indexOf(this.currentTrack.path)
+      ) {
+        randomIndex = Math.floor(Math.random() * this.playlist.items.length)
+      }
+    } else {
+      randomIndex = 0
+    }
+    const nextTrackIndex = !this.random
+      ? (this.playlist.items.indexOf(this.currentTrack.path) + 1) % this.playlist.items.length
+      : randomIndex
     const nextTrack = this.playlist.items[nextTrackIndex]
     this._play(nextTrack)
   }
@@ -354,7 +370,16 @@ class App {
             .render('♪ ' + this.currentTrack.label)
         : style().foreground(COLORS.border).render('nothing playing')
 
-    return style.joinHorizontal(style.position.top, keys, '   ', nowPlaying, ' ', global.debug)
+    return style.joinHorizontal(
+      style.position.top,
+      keys,
+      '   ',
+      nowPlaying,
+      ' ',
+      this.random ? 'Random' : '',
+      ' ',
+      global.debug
+    )
   }
 
   _footerHint() {
@@ -364,7 +389,7 @@ class App {
       case PANEL.PREVIEW:
         return '↑/↓ move · a add to playlist · tab switch'
       case PANEL.PLAYLIST:
-        return '↑/↓ move · ↵ play · q remove · n next · tab switch · ctrl+c quit'
+        return '↑/↓ move · ↵ play · q remove · n next · tab switch · r random · ctrl+c quit'
       default:
         return 'tab switch'
     }

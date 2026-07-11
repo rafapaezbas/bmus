@@ -4,7 +4,6 @@ A lightweight terminal music player for mp3 files, built on the [`bare`](https:/
 
 <img width="3356" height="2036" alt="image" src="https://github.com/user-attachments/assets/2781efaa-e822-4b62-99e4-70cdda3b1b1e" />
 
-
 ## Installation
 
 ```bash
