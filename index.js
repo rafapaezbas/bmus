@@ -2,6 +2,7 @@ const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('@holepunchto/bare-tui')
 const {
   filterMp3Files,
+  searchMp3Files,
   Player,
   Preview,
   Playlist,
@@ -128,15 +129,15 @@ class App {
   _addSelectedToPlaylist() {
     const track = this._selectedPreviewTrackName()
     if (!track) return
-
-    const path = join(this.currentDir, track)
-    this.playlist.addTrack(path)
+    this.playlist.addTrack(track)
   }
 
   _selectedPreviewTrackName() {
     const selected = this.preview.list.selectedItem()
     if (!selected) return null
-    return selected
+    const index = this.preview.list.selected
+    const item = this.preview.items[index]
+    return join(item.path, item.name)
   }
 
   _activePanel() {
@@ -327,12 +328,16 @@ class App {
   _registerCommands() {
     this.textInput.registerCommand('add-all', () => {
       this.preview.items.forEach((item) => {
-        const path = join(this.currentDir, item)
+        const path = join(item.path, item.name)
         this.playlist.addTrack(path)
       })
     })
     this.textInput.registerCommand('clear', () => {
       this.playlist.clear()
+    })
+    this.textInput.registerCommand('search', () => {
+      this.preview.items = searchMp3Files(this.currentDir)
+      this.preview.refresh()
     })
   }
 
