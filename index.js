@@ -1,5 +1,5 @@
 const { join, basename } = require('bare-path')
-const { Program, quit, key, filepicker, style } = require('@holepunchto/bare-tui')
+const { Program, quit, key, filepicker, style } = require('bare-tui')
 const {
   filterMp3Files,
   searchMp3Files,
