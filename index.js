@@ -31,10 +31,10 @@ const BOTTOM_PADDING = 10
 
 class App {
   constructor() {
-    this.player = new Player()
     this.preview = new Preview(this)
     this.playlist = new Playlist(this)
     this.textInput = new TextInput(this)
+    this.player = new Player(this._playNext)
     this.width = undefined
     this.height = undefined
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
@@ -47,14 +47,11 @@ class App {
     this.currentTrack = { label: null, path: null }
     this.debug = ''
 
-    this.player.on('stop', ({ signal }) => {
-      if (signal !== 'SIGTERM') this._playNext()
-    })
-
     this._registerCommands()
   }
 
   init() {
+    this.player.ready()
     return this.fp.init()
   }
 
