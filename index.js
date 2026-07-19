@@ -28,9 +28,15 @@ main()
 async function main() {
   await store.ready()
   await updater.ready()
+
+  updater.on('updated', async () => {
+    await updater.applyUpdate()
+  })
+
   swarm.join(updater.drive.core.discoveryKey)
   run()
 }
+
 function storage() {
   if (isWindows) return path.join(os.homedir(), 'AppData', 'Roaming', 'bmus')
   if (isLinux) return path.join(os.homedir(), '.config', 'bmus')

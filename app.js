@@ -1,5 +1,6 @@
 const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('bare-tui')
+const pkg = require('./package.json')
 const {
   filterMp3Files,
   searchMp3Files,
@@ -315,7 +316,7 @@ class App {
 
   _renderHeader() {
     const logo = style().foreground(COLORS.pink).bold(true).render('♫ bmus')
-    const version = style().foreground(COLORS.border).render('v1.0.0')
+    const version = style().foreground(COLORS.border).render('v' + pkg.version)
     const nowPlaying = this._renderHeaderNowPlaying()
 
     return style()
