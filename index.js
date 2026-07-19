@@ -29,12 +29,8 @@ async function main() {
   await store.ready()
   await updater.ready()
 
-  updater.on('updated', async () => {
-    await updater.applyUpdate()
-  })
-
   swarm.join(updater.drive.core.discoveryKey)
-  run()
+  run(updater)
 }
 
 function storage() {

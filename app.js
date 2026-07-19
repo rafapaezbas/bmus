@@ -1,5 +1,7 @@
 const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('bare-tui')
+const updaterWidget = require('bare-tui-updater')
+const { wire } = require('bare-tui-updater/pear')
 const pkg = require('./package.json')
 const {
   filterMp3Files,
@@ -31,7 +33,7 @@ const COLORS = {
 const BOTTOM_PADDING = 10
 
 class App {
-  constructor() {
+  constructor(updater) {
     this.preview = new Preview(this)
     this.playlist = new Playlist(this)
     this.textInput = new TextInput(this)
@@ -48,6 +50,15 @@ class App {
     this.currentTrack = { label: null, path: null }
     this.debug = ''
 
+    this.updater = updater
+    this.updateWidget = updater
+      ? updaterWidget.create({
+          onAccept: async () => {
+            await updater.applyUpdate()
+          }
+        })
+      : null
+
     this._registerCommands()
   }
 
@@ -59,6 +70,12 @@ class App {
   // ---- update ----
 
   update(msg) {
+    if (this.updateWidget) {
+      const [w, cmd] = this.updateWidget.update(msg)
+      this.updateWidget = w
+      if (cmd) return [this, cmd]
+    }
+
     switch (msg.type) {
       case 'filepicker.select':
         this.picked = msg.path
@@ -231,13 +248,14 @@ class App {
   // ---- view ----
 
   view() {
-    return style.joinVertical(
-      style.position.left,
+    const parts = [
       this._renderHeader(),
       this._renderBody(),
       this._renderTextInput(),
+      this.updateWidget ? this.updateWidget.view() : '',
       this._renderFooter()
-    )
+    ].filter(Boolean)
+    return style.joinVertical(style.position.left, ...parts)
   }
 
   _panelBorderColor(panel) {
@@ -394,4 +412,11 @@ class App {
   }
 }
 
-module.exports = () => new Program(new App()).run()
+module.exports = (updater) => {
+  const app = new App(updater)
+  const program = new Program(app)
+  if (app.updateWidget && updater) {
+    wire(app.updateWidget, { updater, send: program.send.bind(program) })
+  }
+  return program.run()
+}
