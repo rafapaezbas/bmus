@@ -50,7 +50,7 @@ async function make() {
       '--name',
       'bmus',
       '--description',
-      'Minimal CLI mp3 player',
+      '"Minimal CLI mp3 player"',
       ...signFlags,
       '--host',
       host,
