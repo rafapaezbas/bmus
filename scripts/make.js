@@ -6,12 +6,6 @@ const { spawn } = require('child_process')
 const { env, platform, arch } = process
 const isWindows = platform === 'win32'
 
-const exists = (filepath) =>
-  fsp
-    .access(filepath)
-    .then(() => true)
-    .catch(() => false)
-
 function waitForExit(child) {
   return new Promise((resolve, reject) => {
     child.on('exit', (code, signal) => {
