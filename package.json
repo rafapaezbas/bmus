@@ -1,6 +1,6 @@
 {
   "name": "bmus",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "bin": "bmus",
   "main": "index.js",
   "upgrade": "pear://kwuhtyubifdjs4i1drp1qpk51uu17f9t4hix8pkj6ornewwtcc6y",
@@ -8,14 +8,14 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write . && lunte --fix .",
     "lint": "prettier --check . && lunte",
-    "make": "npx bare-build --standalone --base . --name bmus --host darwin-arm64 --out out/make index.js"
+    "make": "node scripts/make.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "bare-miniaudio": "^1.0.7",
+    "bare-miniaudio": "^1.0.10",
     "bare-os": "^3.9.3",
     "bare-path": "^3.1.1",
     "bare-tui": "^0.0.3",

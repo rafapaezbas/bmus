@@ -1,0 +1,161 @@
+name: Build Bmus
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-linux-arm:
+        type: boolean
+        default: false
+      run-linux-x64:
+        type: boolean
+        default: false
+      run-macos:
+        type: boolean
+        default: false
+      run-macos-intel:
+        type: boolean
+        default: false
+      run-windows:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build-linux-x64:
+    if: ${{ inputs.run-linux-x64 }}
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 30
+    outputs:
+      artifact-links: ${{ steps.build.outputs.artifact-links }}
+    steps:
+      - name: Setup bare
+        uses: holepunchto/actions/bare-base@v1
+
+      - name: Checkout bmus
+        uses: actions/checkout@v4
+
+      - name: Build linux x64
+        id: build
+        uses: holepunchto/actions/make-pear-app@v1
+        with:
+          channel: bmus
+          standalone_artifact_name: bmus-linux-x64
+          standalone: bmus
+
+  build-linux-arm:
+    if: ${{ inputs.run-linux-arm }}
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-24.04-arm
+    environment: release
+    timeout-minutes: 30
+    outputs:
+      artifact-links: ${{ steps.build.outputs.artifact-links }}
+    steps:
+      - name: Setup bare
+        uses: holepunchto/actions/bare-base@v1
+
+      - name: Checkout bmus
+        uses: actions/checkout@v4
+
+      - name: Build linux arm
+        id: build
+        uses: holepunchto/actions/make-pear-app@v1
+        with:
+          channel: bmus
+          standalone_artifact_name: bmus-linux-arm64
+          standalone: bmus
+
+  build-macos:
+    if: ${{ inputs.run-macos }}
+    permissions:
+      contents: read
+      packages: read
+    runs-on: macos-latest
+    environment: release
+    timeout-minutes: 30
+    outputs:
+      artifact-links: ${{ steps.build.outputs.artifact-links }}
+    steps:
+      - name: Setup bare
+        uses: holepunchto/actions/bare-base@v1
+
+      - name: Checkout bmus
+        uses: actions/checkout@v4
+
+      - name: Build macos
+        id: build
+        uses: holepunchto/actions/make-pear-app@v1
+        with:
+          channel: bmus
+          standalone_artifact_name: bmus-darwin-arm64
+          standalone: bmus
+          macos_certificate_base64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          macos_p12_password: ${{ secrets.MACOS_P12_PASSWORD }}
+          macos_codesign_identity: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          macos_notarization_method: apple_id_password
+          macos_apple_id: ${{ secrets.MACOS_APPLE_ID }}
+          macos_apple_password: ${{ secrets.MACOS_APPLE_PASSWORD }}
+          macos_apple_team_id: ${{ secrets.MACOS_APPLE_TEAM_ID }}
+
+  build-macos-x64:
+    if: ${{ inputs.run-macos-intel }}
+    permissions:
+      contents: read
+      packages: read
+    runs-on: macos-26-intel
+    environment: release
+    timeout-minutes: 30
+    outputs:
+      artifact-links: ${{ steps.build.outputs.artifact-links }}
+    steps:
+      - name: Setup bare
+        uses: holepunchto/actions/bare-base@v1
+
+      - name: Checkout bmus
+        uses: actions/checkout@v4
+
+      - name: Build macos x64
+        id: build
+        uses: holepunchto/actions/make-pear-app@v1
+        with:
+          channel: bmus
+          standalone_artifact_name: bmus-darwin-x64
+          standalone: bmus
+          macos_certificate_base64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          macos_p12_password: ${{ secrets.MACOS_P12_PASSWORD }}
+          macos_codesign_identity: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+          macos_notarization_method: apple_id_password
+          macos_apple_id: ${{ secrets.MACOS_APPLE_ID }}
+          macos_apple_password: ${{ secrets.MACOS_APPLE_PASSWORD }}
+          macos_apple_team_id: ${{ secrets.MACOS_APPLE_TEAM_ID }}
+
+  build-win32:
+    if: ${{ inputs.run-windows }}
+    permissions:
+      contents: read
+      packages: read
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 30
+    outputs:
+      artifact-links: ${{ steps.build.outputs.artifact-links }}
+    steps:
+      - name: Checkout bmus
+        uses: actions/checkout@v4
+
+      - name: Build windows
+        id: build
+        uses: holepunchto/actions/make-pear-app@v1
+        with:
+          channel: bmus
+          standalone_artifact_name: bmus-win32-x64
+          standalone: bmus.exe

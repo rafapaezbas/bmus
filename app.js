@@ -13,6 +13,7 @@ const {
   TextInput
 } = require('./lib/utils.js')
 
+let program = null
 global.debug = ''
 
 const PANEL = {
@@ -37,7 +38,7 @@ class App {
     this.preview = new Preview(this)
     this.playlist = new Playlist(this)
     this.textInput = new TextInput(this)
-    this.player = new Player(this._playNext.bind(this))
+    this.player = new Player(() => program.send({ type: 'track.ended' }))
     this.width = undefined
     this.height = undefined
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
@@ -85,6 +86,10 @@ class App {
         this.currentDir = msg.dir
         this._setPreviewItems(msg.dir)
         return this._updateFp(msg)
+
+      case 'track.ended':
+        this._playNext()
+        return [this, null]
 
       case 'resize':
         this._resize(msg.width, msg.height)
@@ -177,6 +182,7 @@ class App {
   }
 
   _playNext() {
+    if (this.playlist.items.length === 0) return
     let randomIndex = -1
     if (this.playlist.items.length > 1) {
       while (
@@ -193,6 +199,9 @@ class App {
       : randomIndex
     const nextTrack = this.playlist.items[nextTrackIndex]
     this._play(nextTrack)
+
+    this.playlist.refresh()
+    this.preview.refresh()
   }
 
   _updateFp(msg) {
@@ -334,7 +343,9 @@ class App {
 
   _renderHeader() {
     const logo = style().foreground(COLORS.pink).bold(true).render('♫ bmus')
-    const version = style().foreground(COLORS.border).render('v' + pkg.version)
+    const version = style()
+      .foreground(COLORS.border)
+      .render('v' + pkg.version)
     const nowPlaying = this._renderHeaderNowPlaying()
 
     return style()
@@ -414,7 +425,7 @@ class App {
 
 module.exports = (updater) => {
   const app = new App(updater)
-  const program = new Program(app)
+  program = new Program(app)
   if (app.updateWidget && updater) {
     wire(app.updateWidget, { updater, send: program.send.bind(program) })
   }
