@@ -182,9 +182,10 @@ class App {
       ? (this.playlist.items.indexOf(this.currentTrack.path) + 1) % this.playlist.items.length
       : randomIndex
     const nextTrack = this.playlist.items[nextTrackIndex]
+    this._play(nextTrack)
+
     this.playlist.refresh()
     this.preview.refresh()
-    this._play(nextTrack)
   }
 
   _updateFp(msg) {
