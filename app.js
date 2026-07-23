@@ -165,7 +165,6 @@ class App {
   }
 
   _playNext() {
-    global.debug = 'next'
     if (this.playlist.items.length === 0) return
     let randomIndex = -1
     if (this.playlist.items.length > 1) {
