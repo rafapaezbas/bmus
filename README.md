@@ -1,6 +1,6 @@
 # bmus
 
-A lightweight terminal music player for mp3 files, built on the [`bare`](https://github.com/holepunch/bare) runtime and [`bare-tui`](https://github.com/holepunchto/bare-tui).
+A lightweight terminal music player for audio files, built on the [`bare`](https://github.com/holepunch/bare) runtime and [`bare-tui`](https://github.com/holepunchto/bare-tui).
 
 <img width="3356" height="2036" alt="image" src="https://github.com/user-attachments/assets/2781efaa-e822-4b62-99e4-70cdda3b1b1e" />
 

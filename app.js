@@ -2,8 +2,8 @@ const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('bare-tui')
 const pkg = require('./package.json')
 const {
-  filterMp3Files,
-  searchMp3Files,
+  filterAudioFiles,
+  searchAudioFiles,
   Player,
   Preview,
   Playlist,
@@ -194,7 +194,7 @@ class App {
   }
 
   _setPreviewItems(path) {
-    this.preview.items = filterMp3Files(path)
+    this.preview.items = filterAudioFiles(path)
     this.preview.refresh()
   }
 
@@ -283,7 +283,7 @@ class App {
 
     const content = this.preview.list.items.length
       ? this.preview.view(this.width / 2, height)
-      : style().foreground(COLORS.muted).italic(true).render('No mp3 files here')
+      : style().foreground(COLORS.muted).italic(true).render('No audio files here')
 
     const box = style()
       .border(style.borders.rounded)
@@ -361,7 +361,7 @@ class App {
       this.playlist.clear()
     })
     this.textInput.registerCommand('search', () => {
-      this.preview.items = searchMp3Files(this.currentDir)
+      this.preview.items = searchAudioFiles(this.currentDir)
       this.preview.refresh()
     })
   }
