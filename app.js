@@ -32,7 +32,7 @@ const COLORS = {
 const BOTTOM_PADDING = 10
 
 class App {
-  constructor() {
+  constructor(opts = {}) {
     this.preview = new Preview(this)
     this.playlist = new Playlist(this)
     this.textInput = new TextInput(this)
@@ -48,6 +48,7 @@ class App {
     this.random = false
     this.currentTrack = { label: null, path: null }
     this.debug = ''
+    this._teardown = opts.teardown
 
     this._registerCommands()
   }
@@ -81,6 +82,7 @@ class App {
       case 'key':
         if (key.matches(msg, 'ctrl+c')) {
           this.player.stop()
+          this._teardown()
           return [this, quit]
         }
         if (key.matches(msg, 'tab') && !key.matches(msg, 'shift+tab')) this.selectedPanel++
@@ -405,5 +407,7 @@ class App {
   }
 }
 
-program = new Program(new App())
-module.exports = () => program.run()
+module.exports = (teardown) => {
+  program = new Program(new App({ teardown }))
+  return program.run()
+}
