@@ -28,13 +28,17 @@ main()
 async function main() {
   await store.ready()
   await updater.ready()
-
   swarm.join(updater.drive.core.discoveryKey)
-  run(updater)
+  run(teardown, updater)
 }
 
 function storage() {
   if (isWindows) return path.join(os.homedir(), 'AppData', 'Roaming', 'bmus')
   if (isLinux) return path.join(os.homedir(), '.config', 'bmus')
   return path.join(os.homedir(), 'Library', 'Application Support', 'bmus')
+}
+
+function teardown() {
+  store.close()
+  swarm.destroy()
 }

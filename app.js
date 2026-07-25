@@ -4,8 +4,8 @@ const updaterWidget = require('bare-tui-updater')
 const { wire } = require('bare-tui-updater/pear')
 const pkg = require('./package.json')
 const {
-  filterMp3Files,
-  searchMp3Files,
+  filterAudioFiles,
+  searchAudioFiles,
   Player,
   Preview,
   Playlist,
@@ -34,7 +34,7 @@ const COLORS = {
 const BOTTOM_PADDING = 10
 
 class App {
-  constructor(updater) {
+  constructor(opts = {}) {
     this.preview = new Preview(this)
     this.playlist = new Playlist(this)
     this.textInput = new TextInput(this)
@@ -50,9 +50,10 @@ class App {
     this.random = false
     this.currentTrack = { label: null, path: null }
     this.debug = ''
+    this._teardown = opts.teardown
 
-    this.updater = updater
-    this.updateWidget = updater
+    this.updater = opts.updater
+    this.updateWidget = opts.updater
       ? updaterWidget.create({
           onAccept: async () => {
             await updater.applyUpdate()
@@ -98,6 +99,7 @@ class App {
       case 'key':
         if (key.matches(msg, 'ctrl+c')) {
           this.player.stop()
+          this._teardown()
           return [this, quit]
         }
         if (key.matches(msg, 'tab') && !key.matches(msg, 'shift+tab')) this.selectedPanel++
@@ -211,7 +213,7 @@ class App {
   }
 
   _setPreviewItems(path) {
-    this.preview.items = filterMp3Files(path)
+    this.preview.items = filterAudioFiles(path)
     this.preview.refresh()
   }
 
@@ -301,7 +303,7 @@ class App {
 
     const content = this.preview.list.items.length
       ? this.preview.view(this.width / 2, height)
-      : style().foreground(COLORS.muted).italic(true).render('No mp3 files here')
+      : style().foreground(COLORS.muted).italic(true).render('No audio files here')
 
     const box = style()
       .border(style.borders.rounded)
@@ -379,7 +381,7 @@ class App {
       this.playlist.clear()
     })
     this.textInput.registerCommand('search', () => {
-      this.preview.items = searchMp3Files(this.currentDir)
+      this.preview.items = searchAudioFiles(this.currentDir)
       this.preview.refresh()
     })
   }
@@ -423,9 +425,8 @@ class App {
   }
 }
 
-module.exports = (updater) => {
-  const app = new App(updater)
-  program = new Program(app)
+module.exports = (teardown, updater) => {
+  program = new Program(new App({ teardown, updater }))
   if (app.updateWidget && updater) {
     wire(app.updateWidget, { updater, send: program.send.bind(program) })
   }
