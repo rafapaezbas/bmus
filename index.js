@@ -40,5 +40,5 @@ function storage() {
 
 function teardown() {
   updater.close()
-  //swarm.destroy() // TODO report segmentation fault
+  swarm.destroy() // TODO report segmentation fault
 }
