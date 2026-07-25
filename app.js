@@ -1,5 +1,7 @@
 const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('bare-tui')
+const updaterWidget = require('bare-tui-updater')
+const { wire } = require('bare-tui-updater/pear')
 const pkg = require('./package.json')
 const {
   filterAudioFiles,
@@ -50,6 +52,15 @@ class App {
     this.debug = ''
     this._teardown = opts.teardown
 
+    this.updater = opts.updater
+    this.updateWidget = opts.updater
+      ? updaterWidget.create({
+          onAccept: async () => {
+            await updater.applyUpdate()
+          }
+        })
+      : null
+
     this._registerCommands()
   }
 
@@ -61,6 +72,12 @@ class App {
   // ---- update ----
 
   update(msg) {
+    if (this.updateWidget) {
+      const [w, cmd] = this.updateWidget.update(msg)
+      this.updateWidget = w
+      if (cmd) return [this, cmd]
+    }
+
     switch (msg.type) {
       case 'filepicker.select':
         this.picked = msg.path
@@ -242,13 +259,14 @@ class App {
   // ---- view ----
 
   view() {
-    return style.joinVertical(
-      style.position.left,
+    const parts = [
       this._renderHeader(),
       this._renderBody(),
       this._renderTextInput(),
+      this.updateWidget ? this.updateWidget.view() : '',
       this._renderFooter()
-    )
+    ].filter(Boolean)
+    return style.joinVertical(style.position.left, ...parts)
   }
 
   _panelBorderColor(panel) {
@@ -407,7 +425,10 @@ class App {
   }
 }
 
-module.exports = (teardown) => {
-  program = new Program(new App({ teardown }))
+module.exports = (teardown, updater) => {
+  program = new Program(new App({ teardown, updater }))
+  if (app.updateWidget && updater) {
+    wire(app.updateWidget, { updater, send: program.send.bind(program) })
+  }
   return program.run()
 }

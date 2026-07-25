@@ -28,13 +28,8 @@ main()
 async function main() {
   await store.ready()
   await updater.ready()
-
-  updater.on('updated', async () => {
-    await updater.applyUpdate()
-  })
-
   swarm.join(updater.drive.core.discoveryKey)
-  run(teardown)
+  run(teardown, updater)
 }
 
 function storage() {
