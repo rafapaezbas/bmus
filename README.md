@@ -4,6 +4,10 @@ A lightweight terminal music player for audio files, built on the [`bare`](https
 
 <img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/81bf3e1a-9318-46ee-9785-0545b6462794" />
 
+## Updates
+
+bmus updates itself peer-to-peer. Using [`pear-runtime-updater`](https://github.com/holepunchto/pear-runtime-updater), new versions are pulled straight from other peers over the network instead of a central server — no registry or app store in the path.
+
 ## Installation
 
 ```bash
