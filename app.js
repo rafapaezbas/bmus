@@ -56,7 +56,7 @@ class App {
     this.updateWidget = opts.updater
       ? updaterWidget.create({
           onAccept: async () => {
-            await updater.applyUpdate()
+            await this.updater.applyUpdate()
           }
         })
       : null
@@ -219,7 +219,7 @@ class App {
 
   _resize(width, height) {
     this.width = width
-    this.height = height
+    this.height = height - 2 // updater padding
 
     const panelHeight = this._contentHeight()
 
@@ -426,7 +426,8 @@ class App {
 }
 
 module.exports = (teardown, updater) => {
-  program = new Program(new App({ teardown, updater }))
+  const app = new App({ teardown, updater })
+  program = new Program(app)
   if (app.updateWidget && updater) {
     wire(app.updateWidget, { updater, send: program.send.bind(program) })
   }
