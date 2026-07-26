@@ -153,17 +153,17 @@ class App {
   }
 
   _addSelectedToPlaylist() {
-    const track = this._selectedPreviewTrackName()
+    const track = this._selectedPreviewTrack()
     if (!track) return
     this.playlist.addTrack(track)
   }
 
-  _selectedPreviewTrackName() {
+  _selectedPreviewTrack() {
     const selected = this.preview.list.selectedItem()
     if (!selected) return null
     const index = this.preview.list.selected
     const item = this.preview.items[index]
-    return join(item.path, item.name)
+    return item
   }
 
   _activePanel() {
@@ -171,9 +171,9 @@ class App {
   }
 
   _playSelectedFromPlaylist() {
-    let path = this.playlist.list.selectedItem()
-    if (!path) return
-    if (path.startsWith('♪ ')) path = path.substring(2)
+    const index = this.playlist.list.selected
+    const item = this.playlist.items[index]
+    const path = join(item.path, item.name)
     this._play(path)
   }
 
@@ -185,22 +185,20 @@ class App {
 
   _playNext() {
     if (this.playlist.items.length === 0) return
-    let randomIndex = -1
-    if (this.playlist.items.length > 1) {
-      while (
-        randomIndex === -1 ||
-        randomIndex === this.playlist.items.indexOf(this.currentTrack.path)
-      ) {
-        randomIndex = Math.floor(Math.random() * this.playlist.items.length)
+    const currentIndex = this.playlist.items.findIndex(
+      (item) => join(item.path, item.name) === this.currentTrack.path
+    )
+    let nextTrackIndex
+    if (this.random && this.playlist.items.length > 1) {
+      nextTrackIndex = currentIndex
+      while (nextTrackIndex === currentIndex) {
+        nextTrackIndex = Math.floor(Math.random() * this.playlist.items.length)
       }
     } else {
-      randomIndex = 0
+      nextTrackIndex = (currentIndex + 1) % this.playlist.items.length
     }
-    const nextTrackIndex = !this.random
-      ? (this.playlist.items.indexOf(this.currentTrack.path) + 1) % this.playlist.items.length
-      : randomIndex
     const nextTrack = this.playlist.items[nextTrackIndex]
-    this._play(nextTrack)
+    this._play(join(nextTrack.path, nextTrack.name))
 
     this.playlist.refresh()
     this.preview.refresh()
@@ -373,8 +371,7 @@ class App {
   _registerCommands() {
     this.textInput.registerCommand('add-all', () => {
       this.preview.items.forEach((item) => {
-        const path = join(item.path, item.name)
-        this.playlist.addTrack(path)
+        this.playlist.addTrack(item)
       })
     })
     this.textInput.registerCommand('clear', () => {
