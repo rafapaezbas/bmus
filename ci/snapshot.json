@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "key": "kzfisrmyzniyx8u9sgw1a1unh79cpkra48emd4ci3hon8wwdi6yy",
+    "length": 8,
+    "namespace": "da5ab1ef4f53adb89d0572c4404c9ff4ebe8aa72e042178d205930494a66536d",
+    "name": "db"
+  },
+  {
+    "key": "9oztfwoh69t5bbfwnmp1xogdawwfr5fecea75jxwxrhokr399qoy",
+    "length": 329,
+    "namespace": null,
+    "name": null
+  }
+]

@@ -1,6 +1,6 @@
 # bmus
 
-A lightweight terminal music player for audio files, built on the [`bare`](https://github.com/holepunch/bare) runtime and [`bare-tui`](https://github.com/holepunchto/bare-tui). Inspired by [`cmus`](https://github.com/cmus/cmus).
+A terminal music player for audio files, built on the [`bare`](https://github.com/holepunch/bare) runtime and [`bare-tui`](https://github.com/holepunchto/bare-tui). Inspired by [`cmus`](https://github.com/cmus/cmus).
 
 <img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/81bf3e1a-9318-46ee-9785-0545b6462794" />
 
