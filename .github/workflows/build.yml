@@ -18,6 +18,12 @@ on:
       run-windows:
         type: boolean
         default: false
+      run-stage:
+        type: boolean
+        default: false
+      stage-dry-run:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -159,3 +165,46 @@ jobs:
           channel: bmus
           standalone_artifact_name: bmus-win32-x64
           standalone: bmus.exe
+
+  stage:
+    needs: [build-linux-x64, build-linux-arm, build-macos, build-macos-x64, build-win32]
+    if: >-
+      ${{ always()
+        && !cancelled()
+        && inputs.run-stage
+        && needs.build-linux-x64.result == 'success'
+        && (!inputs.run-linux-arm || needs.build-linux-arm.result == 'success')
+        && (!inputs.run-macos || needs.build-macos.result == 'success')
+        && (!inputs.run-macos-intel || needs.build-macos-x64.result == 'success')
+        && (!inputs.run-windows || needs.build-win32.result == 'success') }}
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: read
+      actions: read
+    runs-on: macos-latest
+    environment: release
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: out/artifacts
+
+      - name: Build stage artifact
+        env:
+          PACKAGE_JSON_PATH: package.json
+        run: ./scripts/build-stage-artifact.sh out/artifacts out/bmus-stage
+
+      - name: Stage with pear-ci
+        id: pear-ci
+        uses: holepunchto/actions/pear-ci@3ff649db70c90ceb33f6fb3f4132e74f0a97f3a7
+        with:
+          namespace: bmus
+          primary-key: ${{ secrets.PEAR_PRIMARY_KEY }}
+          target: ./out/bmus-stage
+          dry-run: ${{ inputs.stage-dry-run }}
+          github-token: ${{ steps.build_app_token.conclusion == 'success' && steps.build_app_token.outputs.token || github.token }}

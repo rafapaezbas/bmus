@@ -1,6 +1,6 @@
 {
   "name": "bmus",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "bin": "bmus",
   "main": "index.js",
   "upgrade": "pear://kwuhtyubifdjs4i1drp1qpk51uu17f9t4hix8pkj6ornewwtcc6y",
