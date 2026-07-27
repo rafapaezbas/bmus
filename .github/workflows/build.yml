@@ -203,7 +203,7 @@ jobs:
         id: pear-ci
         uses: holepunchto/actions/pear-ci@3ff649db70c90ceb33f6fb3f4132e74f0a97f3a7
         with:
-          namespace: bmus-test
+          namespace: bmus
           primary-key: ${{ secrets.PEAR_PRIMARY_KEY }}
           target: ./out/bmus-stage
           dry-run: ${{ inputs.stage-dry-run }}
