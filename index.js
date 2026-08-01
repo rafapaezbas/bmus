@@ -4,11 +4,15 @@ const { isWindows, isLinux } = require('which-runtime')
 const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
 const PearRuntimeUpdater = require('pear-runtime-updater')
+const SwarmManager = require('swarm-manager')
+const DcentBeatsBackend = require('dcent-beats-backend')
 const pkg = require('./package.json')
 const run = require('./app.js')
 
 const store = new Corestore(path.join(storage(), 'pear-runtime/corestore'))
 const swarm = new Hyperswarm()
+const swarmManager = new SwarmManager(swarm)
+const dbeatsBackend = new DcentBeatsBackend(store, swarmManager)
 
 swarm.on('connection', (c) => {
   store.replicate(c)
@@ -29,7 +33,7 @@ async function main() {
   await store.ready()
   await updater.ready()
   swarm.join(updater.drive.core.discoveryKey)
-  run(teardown, updater)
+  run(teardown, updater, dbeatsBackend)
 }
 
 function storage() {
@@ -38,7 +42,9 @@ function storage() {
   return path.join(os.homedir(), 'Library', 'Application Support', 'bmus')
 }
 
-function teardown() {
+async function teardown() {
+  await dbeatsBackend.close()
   updater.close()
-  swarm.destroy() // TODO report segmentation fault
+  await swarm.destroy() // TODO report segmentation fault
+  await swarmManager.close()
 }
