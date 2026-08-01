@@ -2,6 +2,11 @@ const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('bare-tui')
 const updaterWidget = require('bare-tui-updater')
 const { wire } = require('bare-tui-updater/pear')
+const safetyCatch = require('safety-catch')
+const os = require('bare-os')
+const { pipelinePromise } = require('streamx')
+const fs = require('bare-fs')
+
 const pkg = require('./package.json')
 const {
   filterAudioFiles,
@@ -51,6 +56,12 @@ class App {
     this.currentTrack = { label: null, path: null }
     this.debug = ''
     this._teardown = opts.teardown
+    this.dbeatsBackend = opts.dbeatsBackend
+
+    const tmpDir = join(os.tmpdir(), 'bmus-dbeats')
+    this.dbeatsTmpFile = join(tmpDir, 'song.mp3')
+    // TODO: cleanly and reliably
+    fs.mkdirSync(tmpDir, { recursive: true })
 
     this.updater = opts.updater
     this.updateWidget = opts.updater
@@ -90,6 +101,10 @@ class App {
 
       case 'track.ended':
         this._playNext()
+        return [this, null]
+
+      case 'dbeats.loaded':
+        this.playlist.refresh()
         return [this, null]
 
       case 'resize':
@@ -170,10 +185,15 @@ class App {
     return this.selectedPanel % PANEL_COUNT
   }
 
-  _playSelectedFromPlaylist() {
+  async _playSelectedFromPlaylist() {
     const index = this.playlist.list.selected
     const item = this.playlist.items[index]
-    const path = join(item.path, item.name)
+    let path = join(item.path, item.name)
+
+    if (item.dcent) {
+      path = this.dbeatsTmpFile
+      await pipelinePromise(this.dbeatsBackend.streamSong(item.dcent), fs.createWriteStream(path))
+    }
     this._play(path)
   }
 
@@ -381,6 +401,32 @@ class App {
       this.preview.items = searchAudioFiles(this.currentDir)
       this.preview.refresh()
     })
+    this.textInput.registerCommand('dbeats', async (key) => {
+      try {
+        const playlist = await this.dbeatsBackend.getPlaylist(uidToRecord(key))
+        const metadatas = this.dbeatsBackend.streamSongMetadatas(playlist.songs)
+
+        // Load all before showing for simplicity (since loaded out of order)
+        const res = []
+        for await (const [index, songMeta] of metadatas) {
+          res[index] = { songMeta, song: playlist.songs[index] }
+        }
+
+        for (const { songMeta, song } of res) {
+          this.playlist.addTrack({
+            path: this.dbeatsTmpFile,
+            name: songMeta.title,
+            metadata: { common: { title: songMeta.title, artist: songMeta.artist } },
+            dcent: { ...songMeta, ...song } // keep the record for later streaming
+          })
+        }
+
+        program.send({ type: 'dbeats.loaded' })
+      } catch (err) {
+        safetyCatch(err)
+        global.debug = `dbeats: ${err.message}`
+      }
+    })
   }
 
   _renderFooter() {
@@ -422,8 +468,21 @@ class App {
   }
 }
 
-module.exports = (teardown, updater) => {
-  const app = new App({ teardown, updater })
+function uidToRecord(rawInput) {
+  // TODO: maybe handle inside dcent-beats-backend?
+  const keyEnd = rawInput.indexOf('@')
+  const versionEnd = rawInput.indexOf(':')
+  if (versionEnd <= 0 || keyEnd <= 0) {
+    throw new Error(`invalid playlist identifier: ${rawInput}`)
+  }
+  const driveKey = rawInput.slice(0, keyEnd)
+  const driveVersion = parseInt(rawInput.slice(keyEnd + 1, versionEnd))
+  const location = rawInput.slice(versionEnd + 1)
+  return { driveKey, driveVersion, location }
+}
+
+module.exports = (teardown, updater, dbeatsBackend) => {
+  const app = new App({ teardown, updater, dbeatsBackend })
   program = new Program(app)
   if (app.updateWidget && updater) {
     wire(app.updateWidget, { updater, send: program.send.bind(program) })
