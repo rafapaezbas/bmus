@@ -1,20 +1,16 @@
-const { join, basename } = require('bare-path')
 const { Program, quit, key, filepicker, style } = require('bare-tui')
 const updaterWidget = require('bare-tui-updater')
 const { wire } = require('bare-tui-updater/pear')
 const pkg = require('./package.json')
-const {
-  filterAudioFiles,
-  searchAudioFiles,
-  Player,
-  Preview,
-  Playlist,
-  createFoldersOnlyFs,
-  TextInput
-} = require('./lib/utils.js')
+const { filterAudioFiles, searchAudioFiles, createFoldersOnlyFs } = require('./lib/utils.js')
+const { TextInput, Preview, Playlist } = require('./lib/gui.js')
+const Player = require('./lib/player.js')
 
 let program = null
 global.debug = ''
+
+const PANEL_COUNT = 4
+const BOTTOM_PADDING = 10
 
 const PANEL = {
   FILEPICKER: 0,
@@ -22,7 +18,6 @@ const PANEL = {
   PLAYLIST: 2,
   TEXT_INPUT: 3
 }
-const PANEL_COUNT = 4
 
 const COLORS = {
   accent: '#00D7FF',
@@ -31,26 +26,19 @@ const COLORS = {
   pink: '#FF79C6'
 }
 
-const BOTTOM_PADDING = 10
-
 class App {
   constructor(opts = {}) {
-    this.preview = new Preview(this)
-    this.playlist = new Playlist(this)
-    this.textInput = new TextInput(this)
+    this.preview = new Preview()
+    this.playlist = new Playlist()
+    this.textInput = new TextInput()
     this.player = new Player(() => program.send({ type: 'track.ended' }))
     this.width = undefined
     this.height = undefined
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
-    this.picked = null
     this.selectedPanel = PANEL.FILEPICKER
     this.currentDir = null
-    this.previewTrackNames = []
-    this.isPlaying = false
-    this.random = false
-    this.currentTrack = { label: null, path: null }
     this.debug = ''
-    this._teardown = opts.teardown
+    this.teardown = opts.teardown
 
     this.updater = opts.updater
     this.updateWidget = opts.updater
@@ -69,7 +57,22 @@ class App {
     return this.fp.init()
   }
 
-  // ---- update ----
+  _registerCommands() {
+    this.textInput.registerCommand('add-all', () => {
+      this.preview.items.forEach((item) => {
+        this.player.add(item)
+      })
+      this._refreshLists()
+    })
+    this.textInput.registerCommand('clear', () => {
+      this.player.clear()
+      this._refreshLists()
+    })
+    this.textInput.registerCommand('search', () => {
+      this.preview.items = searchAudioFiles(this.currentDir)
+      this.preview.refresh(this.player.current)
+    })
+  }
 
   update(msg) {
     if (this.updateWidget) {
@@ -80,66 +83,76 @@ class App {
 
     switch (msg.type) {
       case 'filepicker.select':
-        this.picked = msg.path
         return [this, null]
 
       case 'filepicker.entries':
         this.currentDir = msg.dir
-        this._setPreviewItems(msg.dir)
+        this.preview.items = filterAudioFiles(msg.dir)
+        this.preview.refresh(this.player.current)
         return this._updateFp(msg)
 
       case 'track.ended':
-        this._playNext()
+        this.player.next()
+        this._refreshLists()
         return [this, null]
 
-      case 'resize':
-        this._resize(msg.width, msg.height)
+      case 'resize': {
+        this.width = msg.width
+        this.height = msg.height - 2 // updater padding
+
+        const { panelHeight, filepickerWidth, previewWidth, playlistWidth } = this._layout()
+        this.fp.width = filepickerWidth
+        this.fp.height = panelHeight - 1
+        this.preview.list.width = previewWidth
+        this.preview.list.height = panelHeight
+        this.playlist.list.width = playlistWidth
+        this.playlist.list.height = panelHeight
         return [this, null]
+      }
 
       case 'key':
-        if (key.matches(msg, 'ctrl+c')) {
-          this.player.stop()
-          this._teardown()
-          return [this, quit]
-        }
-        if (key.matches(msg, 'tab') && !key.matches(msg, 'shift+tab')) this.selectedPanel++
-        if (key.matches(msg, 'shift+tab')) {
-          if (this.selectedPanel === 0) {
-            this.selectedPanel = PANEL_COUNT
-          } else {
-            this.selectedPanel--
-          }
-        }
-        return this._updateActivePanel(msg)
+        return this._updateKey(msg)
+
+      default:
+        return [this, null]
     }
   }
 
-  _updateActivePanel(msg) {
-    switch (this._activePanel()) {
+  _updateKey(msg) {
+    if (key.matches(msg, 'ctrl+c')) {
+      this.player.stop()
+      this.teardown()
+      return [this, quit]
+    }
+
+    // shift+tab also matches 'tab', so it has to be checked first
+    if (key.matches(msg, 'shift+tab')) this._cyclePanel(-1)
+    else if (key.matches(msg, 'tab')) this._cyclePanel(1)
+
+    switch (this.selectedPanel) {
       case PANEL.FILEPICKER:
         return this._updateFp(msg)
 
-      case PANEL.PREVIEW:
+      case PANEL.PREVIEW: {
         if (key.matches(msg, 'a')) {
-          this._addSelectedToPlaylist()
+          const track = this.preview.items[this.preview.list.selected]
+          if (track) {
+            this.player.add(track)
+            this._refreshLists()
+          }
         }
         return [this, this.preview.update(msg)]
+      }
 
-      case PANEL.PLAYLIST:
-        if (key.matches(msg, 'enter')) {
-          this._playSelectedFromPlaylist()
-          this.playlist.refresh()
-        }
-        if (key.matches(msg, 'n')) {
-          this._playNext()
-        }
-        if (key.matches(msg, 'q')) {
-          this.playlist.removeSelected()
-        }
-        if (key.matches(msg, 'r')) {
-          this.random = !this.random
-        }
+      case PANEL.PLAYLIST: {
+        const selected = this.playlist.list.selected
+        if (key.matches(msg, 'enter')) this.player.play(selected)
+        if (key.matches(msg, 'n')) this.player.next()
+        if (key.matches(msg, 'q')) this.player.remove(selected)
+        if (key.matches(msg, 'r')) this.player.toggleRandom()
+        this._refreshLists()
         return [this, this.playlist.update(msg)]
+      }
 
       case PANEL.TEXT_INPUT:
         if (key.matches(msg, 'enter')) {
@@ -152,95 +165,108 @@ class App {
     }
   }
 
-  _addSelectedToPlaylist() {
-    const track = this._selectedPreviewTrack()
-    if (!track) return
-    this.playlist.addTrack(track)
+  _cyclePanel(delta) {
+    this.selectedPanel = (this.selectedPanel + delta + PANEL_COUNT) % PANEL_COUNT
   }
 
-  _selectedPreviewTrack() {
-    const selected = this.preview.list.selectedItem()
-    if (!selected) return null
-    const index = this.preview.list.selected
-    const item = this.preview.items[index]
-    return item
-  }
-
-  _activePanel() {
-    return this.selectedPanel % PANEL_COUNT
-  }
-
-  _playSelectedFromPlaylist() {
-    const index = this.playlist.list.selected
-    const item = this.playlist.items[index]
-    const path = join(item.path, item.name)
-    this._play(path)
-  }
-
-  _play(path) {
-    this.isPlaying = true
-    this.currentTrack = { label: basename(path), path }
-    this.player.play(path)
-  }
-
-  _playNext() {
-    if (this.playlist.items.length === 0) return
-    const currentIndex = this.playlist.items.findIndex(
-      (item) => join(item.path, item.name) === this.currentTrack.path
-    )
-    let nextTrackIndex
-    if (this.random && this.playlist.items.length > 1) {
-      nextTrackIndex = currentIndex
-      while (nextTrackIndex === currentIndex) {
-        nextTrackIndex = Math.floor(Math.random() * this.playlist.items.length)
-      }
-    } else {
-      nextTrackIndex = (currentIndex + 1) % this.playlist.items.length
-    }
-    const nextTrack = this.playlist.items[nextTrackIndex]
-    this._play(join(nextTrack.path, nextTrack.name))
-
-    this.playlist.refresh()
-    this.preview.refresh()
+  _refreshLists() {
+    this.playlist.refresh(this.player.playlist, this.player.currentIndex)
+    this.preview.refresh(this.player.current)
   }
 
   _updateFp(msg) {
-    const [fp, cmd] = this.fp.update(msg)
-    this.fp = fp
+    const [, cmd] = this.fp.update(msg) // the filepicker updates in place
     return [this, cmd]
   }
 
-  _setPreviewItems(path) {
-    this.preview.items = filterAudioFiles(path)
-    this.preview.refresh()
+  view() {
+    const parts = [
+      this._renderHeader(),
+      this._renderBody(),
+      this._renderTextInput(),
+      this.updateWidget ? this.updateWidget.view() : '',
+      this._renderFooter()
+    ].filter(Boolean)
+    return style.joinVertical(style.position.left, ...parts)
   }
 
-  _resize(width, height) {
-    this.width = width
-    this.height = height - 2 // updater padding
-
-    const panelHeight = this._contentHeight()
-
-    this.fp.width = width / 6
-    this.fp.height = panelHeight - 1
-
-    this.preview.list.width = (width / 6) * 2 - 8
-    this.preview.list.height = panelHeight
-
-    this.playlist.list.width = (width / 6) * 3
-    this.playlist.list.height = panelHeight
+  _layout() {
+    const column = this.width / 6
+    return {
+      panelHeight: this.height - BOTTOM_PADDING - 1,
+      filepickerWidth: column,
+      previewWidth: column * 2 - 8,
+      playlistWidth: column * 3
+    }
   }
 
-  _contentHeight() {
-    return this.height - BOTTOM_PADDING - 1
+  _panelBox(panel, label, content, width, height) {
+    const box = style()
+      .border(style.borders.rounded)
+      .borderForeground(this._panelBorderColor(panel))
+      .padding(0, 1)
+      .width(width)
+      .height(height)
+      .render(content)
+
+    return style.joinVertical(style.position.left, this._sectionLabel(label, panel), box)
+  }
+
+  _panelBorderColor(panel) {
+    return this.selectedPanel === panel ? COLORS.accent : COLORS.border
+  }
+
+  _sectionLabel(text, panel) {
+    return style()
+      .foreground(this._panelBorderColor(panel))
+      .bold(true)
+      .render(' ' + text)
+  }
+
+  _countLabel(text, count) {
+    return count ? `${text} (${count})` : text
+  }
+
+  _renderHeader() {
+    const logo = style().foreground(COLORS.pink).bold(true).render('♫ bmus')
+    const version = style()
+      .foreground(COLORS.border)
+      .render('v' + pkg.version)
+
+    return style()
+      .border(style.borders.rounded)
+      .borderForeground(COLORS.border)
+      .width(this.width - 2)
+      .render(
+        style.joinHorizontal(
+          style.position.top,
+          logo,
+          '  ',
+          version,
+          '   ',
+          this._renderHeaderNowPlaying()
+        )
+      )
+  }
+
+  _renderHeaderNowPlaying() {
+    const current = this.player.current
+    if (current) {
+      return (
+        style().foreground(COLORS.muted).render('playing: ') +
+        style().foreground(COLORS.accent).render(current.name)
+      )
+    }
+
+    return style()
+      .foreground(COLORS.border)
+      .render('─'.repeat(Math.max(0, this.width - 24)))
   }
 
   _renderBody() {
     const menu = this.textInput.input.menuView()
-    let menuLines = 0
-    if (menu) {
-      menuLines = menu.split('\n').length
-    }
+    const menuLines = menu ? menu.split('\n').length : 0
+
     return style()
       .height(this.height - BOTTOM_PADDING + 2 - menuLines)
       .render(
@@ -254,83 +280,29 @@ class App {
       )
   }
 
-  // ---- view ----
-
-  view() {
-    const parts = [
-      this._renderHeader(),
-      this._renderBody(),
-      this._renderTextInput(),
-      this.updateWidget ? this.updateWidget.view() : '',
-      this._renderFooter()
-    ].filter(Boolean)
-    return style.joinVertical(style.position.left, ...parts)
-  }
-
-  _panelBorderColor(panel) {
-    return this._activePanel() === panel ? COLORS.accent : COLORS.border
-  }
-
-  _sectionLabel(text, panel) {
-    const color = this._panelBorderColor(panel)
-    return style()
-      .foreground(color)
-      .bold(true)
-      .render(' ' + text)
-  }
-
   _renderFilepicker() {
-    const box = style()
-      .border(style.borders.rounded)
-      .borderForeground(this._panelBorderColor(PANEL.FILEPICKER))
-      .padding(0, 1)
-      .width(this.width / 6)
-      .height(this.height - BOTTOM_PADDING - 1)
-      .render(this.fp.view())
+    const { panelHeight, filepickerWidth } = this._layout()
 
-    return style.joinVertical(
-      style.position.left,
-      this._sectionLabel('Library', PANEL.FILEPICKER),
-      box
-    )
+    return this._panelBox(PANEL.FILEPICKER, 'Library', this.fp.view(), filepickerWidth, panelHeight)
   }
 
   _renderPreview() {
-    const width = (this.width / 6) * 2 - 8
-    const height = this.height - BOTTOM_PADDING - 1
+    const { panelHeight, previewWidth } = this._layout()
 
     const content = this.preview.list.items.length
-      ? this.preview.view(this.width / 2, height)
+      ? this.preview.view(this.width / 2, panelHeight)
       : style().foreground(COLORS.muted).italic(true).render('No audio files here')
 
-    const box = style()
-      .border(style.borders.rounded)
-      .borderForeground(this._panelBorderColor(PANEL.PREVIEW))
-      .padding(0, 1)
-      .width(width)
-      .height(height)
-      .render(content)
-
-    const label = `Track${this.previewTrackNames.length ? ` (${this.previewTrackNames.length})` : ''}`
-
-    return style.joinVertical(style.position.left, this._sectionLabel(label, PANEL.PREVIEW), box)
+    const label = this._countLabel('Track', this.preview.items.length)
+    return this._panelBox(PANEL.PREVIEW, label, content, previewWidth, panelHeight)
   }
 
   _renderPlaylist() {
-    const width = (this.width / 6) * 3 - 5
-    const height = this.height - BOTTOM_PADDING - 1
+    const { panelHeight, playlistWidth } = this._layout()
 
-    const box = style()
-      .border(style.borders.rounded)
-      .borderForeground(this._panelBorderColor(PANEL.PLAYLIST))
-      .padding(0, 1)
-      .width(width)
-      .height(height)
-      .render(this.playlist.view((this.width / 6) * 3 - 6, height))
-
-    const label = `Queue${this.playlist.items.length ? ` (${this.playlist.items.length})` : ''}`
-
-    return style.joinVertical(style.position.left, this._sectionLabel(label, PANEL.PLAYLIST), box)
+    const content = this.playlist.view(playlistWidth - 6, panelHeight)
+    const label = this._countLabel('Queue', this.playlist.list.items.length)
+    return this._panelBox(PANEL.PLAYLIST, label, content, playlistWidth - 5, panelHeight)
   }
 
   _renderTextInput() {
@@ -341,60 +313,18 @@ class App {
       .render(this.textInput.view())
   }
 
-  _renderHeader() {
-    const logo = style().foreground(COLORS.pink).bold(true).render('♫ bmus')
-    const version = style()
-      .foreground(COLORS.border)
-      .render('v' + pkg.version)
-    const nowPlaying = this._renderHeaderNowPlaying()
-
-    return style()
-      .border(style.borders.rounded)
-      .borderForeground(COLORS.border)
-      .width(this.width - 2)
-      .render(style.joinHorizontal(style.position.top, logo, '  ', version, '   ', nowPlaying))
-  }
-
-  _renderHeaderNowPlaying() {
-    if (this.isPlaying && this.currentTrack.label) {
-      return (
-        style().foreground(COLORS.muted).render('playing: ') +
-        style().foreground(COLORS.accent).render(this.currentTrack.label)
-      )
-    }
-
-    return style()
-      .foreground(COLORS.border)
-      .render('─'.repeat(Math.max(0, this.width - 24)))
-  }
-
-  _registerCommands() {
-    this.textInput.registerCommand('add-all', () => {
-      this.preview.items.forEach((item) => {
-        this.playlist.addTrack(item)
-      })
-    })
-    this.textInput.registerCommand('clear', () => {
-      this.playlist.clear()
-    })
-    this.textInput.registerCommand('search', () => {
-      this.preview.items = searchAudioFiles(this.currentDir)
-      this.preview.refresh()
-    })
-  }
-
   _renderFooter() {
     const keys = style()
       .foreground(COLORS.muted)
       .render('  ' + this._footerHint())
 
-    const nowPlaying =
-      this.isPlaying && this.currentTrack.label
-        ? style()
-            .foreground(COLORS.pink)
-            .bold(true)
-            .render('♪ ' + this.currentTrack.label)
-        : style().foreground(COLORS.border).render('nothing playing')
+    const current = this.player.current
+    const nowPlaying = current
+      ? style()
+          .foreground(COLORS.pink)
+          .bold(true)
+          .render('♪ ' + current.name)
+      : style().foreground(COLORS.border).render('nothing playing')
 
     return style.joinHorizontal(
       style.position.top,
@@ -402,14 +332,14 @@ class App {
       '   ',
       nowPlaying,
       ' ',
-      this.random ? 'Random' : '',
+      this.player.random ? 'Random' : '',
       ' ',
       global.debug
     )
   }
 
   _footerHint() {
-    switch (this._activePanel()) {
+    switch (this.selectedPanel) {
       case PANEL.FILEPICKER:
         return '↑/↓ move · ↵/→ open · ⌫/← up · tab switch'
       case PANEL.PREVIEW:
