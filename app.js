@@ -1,8 +1,14 @@
-const { Program, quit, key, filepicker, style } = require('bare-tui')
+const { Program, quit, key, filepicker, style, batch } = require('bare-tui')
 const updaterWidget = require('bare-tui-updater')
 const { wire } = require('bare-tui-updater/pear')
 const pkg = require('./package.json')
-const { filterAudioFiles, searchAudioFiles, createFoldersOnlyFs } = require('./lib/utils.js')
+const {
+  filterAudioFiles,
+  searchAudioFiles,
+  createFoldersOnlyFs,
+  readTrackMetadata,
+  mapLimit
+} = require('./lib/utils.js')
 const { TextInput, Preview, Playlist } = require('./lib/gui.js')
 const Player = require('./lib/player.js')
 
@@ -11,6 +17,7 @@ global.debug = ''
 
 const PANEL_COUNT = 4
 const BOTTOM_PADDING = 10
+const METADATA_CONCURRENCY = 8
 
 const PANEL = {
   FILEPICKER: 0,
@@ -58,19 +65,19 @@ class App {
   }
 
   _registerCommands() {
-    this.textInput.registerCommand('add-all', () => {
-      this.preview.items.forEach((item) => {
-        this.player.add(item)
+    this.textInput.registerCommand('add-all', async () => {
+      const entries = await mapLimit(this.preview.items, METADATA_CONCURRENCY, async (e) => {
+        return { ...e, metadata: await readTrackMetadata(e) }
       })
-      this._refreshLists()
+      return { type: 'playlist.entries', entries }
     })
     this.textInput.registerCommand('clear', () => {
-      this.player.clear()
-      this._refreshLists()
+      return { type: 'playlist.entries', entries: [] }
     })
-    this.textInput.registerCommand('search', () => {
-      this.preview.items = searchAudioFiles(this.currentDir)
-      this.preview.refresh(this.player.current)
+    this.textInput.registerCommand('search', async () => {
+      const dir = this.currentDir // capture, it can change while the search runs
+      const entries = await searchAudioFiles(dir)
+      return { type: 'preview.entries', dir, entries }
     })
   }
 
@@ -85,11 +92,45 @@ class App {
       case 'filepicker.select':
         return [this, null]
 
-      case 'filepicker.entries':
+      case 'filepicker.entries': {
+        const [, cmd] = this.fp.update(msg)
+        if (msg.dir !== this.fp.cwd) return [this, cmd]
+
         this.currentDir = msg.dir
-        this.preview.items = filterAudioFiles(msg.dir)
+        return [
+          this,
+          batch([
+            cmd,
+            async () => {
+              return {
+                type: 'preview.entries',
+                dir: msg.dir,
+                entries: await filterAudioFiles(msg.dir)
+              }
+            }
+          ])
+        ]
+      }
+
+      case 'playlist.entries':
+        if (msg.entries.length === 0) {
+          this.player.clear()
+        } else {
+          msg.entries.forEach((e) => this.player.add(e))
+        }
+        this._refreshLists()
+        return [this, null]
+
+      case 'playlist.add':
+        this.player.add(msg.track)
+        this._refreshLists()
+        return [this, null]
+
+      case 'preview.entries':
+        if (msg.dir !== this.currentDir) return [this, null] // stale, we moved on
+        this.preview.items = msg.entries
         this.preview.refresh(this.player.current)
-        return this._updateFp(msg)
+        return [this, null]
 
       case 'track.ended':
         this.player.next()
@@ -137,8 +178,13 @@ class App {
         if (key.matches(msg, 'a')) {
           const track = this.preview.items[this.preview.list.selected]
           if (track) {
-            this.player.add(track)
-            this._refreshLists()
+            return [
+              this,
+              async () => ({
+                type: 'playlist.add',
+                track: { ...track, metadata: await readTrackMetadata(track) }
+              })
+            ]
           }
         }
         return [this, this.preview.update(msg)]
@@ -156,9 +202,10 @@ class App {
 
       case PANEL.TEXT_INPUT:
         if (key.matches(msg, 'enter')) {
-          this.textInput.submit(msg)
+          const cmd = () => this.textInput.submit(msg)
+          return [this, cmd]
         }
-        return this.textInput.update(msg)
+        return [this, this.textInput.update(msg)]
 
       default:
         return [this, null]
