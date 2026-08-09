@@ -5,7 +5,8 @@ const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
 const PearRuntimeUpdater = require('pear-runtime-updater')
 const pkg = require('./package.json')
-const run = require('./app.js')
+const runGUI = require('./app.js')
+const runHeadless = require('./mcp.js')
 
 const store = new Corestore(path.join(storage(), 'pear-runtime/corestore'))
 const swarm = new Hyperswarm()
@@ -29,7 +30,11 @@ async function main() {
   await store.ready()
   await updater.ready()
   swarm.join(updater.drive.core.discoveryKey)
-  run(teardown, updater)
+  if (Bare.argv.includes('--headless')) {
+    runHeadless(teardown)
+  } else {
+    runGUI(teardown, updater)
+  }
 }
 
 function storage() {
