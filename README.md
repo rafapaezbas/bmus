@@ -10,9 +10,22 @@ bmus updates itself peer-to-peer. Using [`pear-runtime-updater`](https://github.
 
 ## Installation
 
+### With pear
+
 ```bash
 pear install pear://kzfisrmyzniyx8u9sgw1a1unh79cpkra48emd4ci3hon8wwdi6yy
 ```
+
+### From the release page
+
+Grab the archive for your platform from the [releases page](https://github.com/rafapaezbas/bmus/releases), unzip it, and move the `bmus` binary somewhere in your `$PATH`:
+
+```bash
+unzip bmus-darwin-arm64.zip
+mv bmus $HOME/.local/bin/
+```
+
+Builds are published for `darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64` and `win32-x64`.
 
 ## Usage
 
