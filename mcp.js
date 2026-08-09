@@ -1,5 +1,3 @@
-// Headless MCP server for bmus. Owns the audio device and the queue for the
-// lifetime of this process — playback stops when the client disconnects.
 const process = require('bare-process')
 const fs = require('bare-fs')
 const { join, dirname, basename, resolve, extname } = require('bare-path')
@@ -288,9 +286,6 @@ let closed = false
 async function teardown() {
   if (closed) return
   closed = true
-
-  // Let in-flight requests finish so their responses still reach the client,
-  // but never hang the shutdown on a handler that misbehaves.
   await Promise.race([server.drain(), new Promise((resolve) => setTimeout(resolve, 2000))])
 
   try {
