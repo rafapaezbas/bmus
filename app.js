@@ -79,21 +79,8 @@ class App {
       case 'filepicker.entries': {
         const [, cmd] = this.fp.update(msg)
         if (msg.dir !== this.fp.cwd) return [this, cmd]
-
         this.currentDir = msg.dir
-        return [
-          this,
-          batch([
-            cmd,
-            async () => {
-              return {
-                type: 'preview.entries',
-                dir: msg.dir,
-                entries: await filterAudioFiles(msg.dir)
-              }
-            }
-          ])
-        ]
+        return [this, batch([cmd, this._listPreviewEntries(msg)])]
       }
 
       case 'playlist.entries':
@@ -154,46 +141,68 @@ class App {
     if (key.matches(msg, 'shift+tab')) this._cyclePanel(-1)
     else if (key.matches(msg, 'tab')) this._cyclePanel(1)
 
+    // the key is then handed to the panel we just switched to
     switch (this.selectedPanel) {
       case PANEL.FILEPICKER:
-        return this._updateFp(msg)
+        return this._filepickerKey(msg)
 
-      case PANEL.PREVIEW: {
-        if (key.matches(msg, 'a')) {
-          const track = this.preview.items[this.preview.list.selected]
-          if (track) {
-            return [
-              this,
-              async () => ({
-                type: 'playlist.add',
-                track: { ...track, metadata: await readTrackMetadata(track) }
-              })
-            ]
-          }
-        }
-        return [this, this.preview.update(msg)]
-      }
+      case PANEL.PREVIEW:
+        return this._previewKey(msg)
 
-      case PANEL.PLAYLIST: {
-        const selected = this.playlist.list.selected
-        if (key.matches(msg, 'enter')) this.player.play(selected)
-        if (key.matches(msg, 'n')) this.player.next()
-        if (key.matches(msg, 'q')) this.player.remove(selected)
-        if (key.matches(msg, 'r')) this.player.toggleRandom()
-        this._refreshLists()
-        return [this, this.playlist.update(msg)]
-      }
+      case PANEL.PLAYLIST:
+        return this._playlistKey(msg)
 
       case PANEL.TEXT_INPUT:
-        if (key.matches(msg, 'enter')) {
-          const cmd = () => this.textInput.submit(msg)
-          return [this, cmd]
-        }
-        return [this, this.textInput.update(msg)]
+        return this._textInputKey(msg)
 
       default:
         return [this, null]
     }
+  }
+
+  _listPreviewEntries(msg) {
+    return async () => {
+      return {
+        type: 'preview.entries',
+        dir: msg.dir,
+        entries: await filterAudioFiles(msg.dir)
+      }
+    }
+  }
+
+  _filepickerKey(msg) {
+    const [, cmd] = this.fp.update(msg) // the filepicker updates in place
+    return [this, cmd]
+  }
+
+  _previewKey(msg) {
+    if (key.matches(msg, 'a')) {
+      const track = this.preview.items[this.preview.list.selected]
+      if (track) return [this, this._addTrackCmd(track)]
+    }
+    return [this, this.preview.update(msg)]
+  }
+
+  _playlistKey(msg) {
+    const selected = this.playlist.list.selected
+    if (key.matches(msg, 'enter')) this.player.play(selected)
+    if (key.matches(msg, 'n')) this.player.next()
+    if (key.matches(msg, 'q')) this.player.remove(selected)
+    if (key.matches(msg, 'r')) this.player.toggleRandom()
+    this._refreshLists()
+    return [this, this.playlist.update(msg)]
+  }
+
+  _textInputKey(msg) {
+    if (key.matches(msg, 'enter')) return [this, () => this.textInput.submit(msg)]
+    return [this, this.textInput.update(msg)]
+  }
+
+  _addTrackCmd(track) {
+    return async () => ({
+      type: 'playlist.add',
+      track: { ...track, metadata: await readTrackMetadata(track) }
+    })
   }
 
   _cyclePanel(delta) {
@@ -203,11 +212,6 @@ class App {
   _refreshLists() {
     this.playlist.refresh(this.player.playlist, this.player.currentIndex)
     this.preview.refresh(this.player.current)
-  }
-
-  _updateFp(msg) {
-    const [, cmd] = this.fp.update(msg) // the filepicker updates in place
-    return [this, cmd]
   }
 
   view() {
