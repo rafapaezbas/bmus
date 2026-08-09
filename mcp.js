@@ -70,8 +70,9 @@ server.tool('queue_add', {
     },
     required: ['paths']
   },
-  handler: ({ paths }) => {
-    const tracks = requireArray(paths, 'paths').flatMap((p) => tracksAtPath(p))
+  handler: async ({ paths }) => {
+    const resolved = await Promise.all(requireArray(paths, 'paths').map((p) => tracksAtPath(p)))
+    const tracks = resolved.flat()
     if (tracks.length === 0) return 'No audio files found at those paths.'
     for (const track of tracks) player.add(track)
     return `Added ${tracks.length} track(s). Queue now has ${player.playlist.length}.`
@@ -168,14 +169,14 @@ server.tool('browse_directory', {
     properties: { path: { type: 'string', description: 'Absolute path to a directory.' } },
     required: ['path']
   },
-  handler: ({ path }) => {
+  handler: async ({ path }) => {
     const dir = requireDirectory(path)
-    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true })
     const dirs = entries
       .filter((e) => e.isDirectory())
       .map((e) => `${join(dir, e.name)}/`)
       .sort()
-    const files = filterAudioFiles(dir).map((track) => join(track.path, track.name))
+    const files = (await filterAudioFiles(dir)).map((track) => join(track.path, track.name))
     if (dirs.length === 0 && files.length === 0) {
       return `${dir} has no sub-directories or audio files.`
     }
@@ -196,12 +197,12 @@ server.tool('search_library', {
     },
     required: ['path']
   },
-  handler: ({ path, query, limit }) => {
+  handler: async ({ path, query, limit }) => {
     const dir = requireDirectory(path)
     const needle = typeof query === 'string' ? query.toLowerCase() : null
     const max = Number.isInteger(limit) && limit > 0 ? limit : 100
 
-    const matches = searchAudioFiles(dir).filter(
+    const matches = (await searchAudioFiles(dir)).filter(
       (track) => needle === null || track.name.toLowerCase().includes(needle)
     )
     if (matches.length === 0) return 'No matching audio files.'
@@ -224,16 +225,16 @@ function describe(track) {
   return `${label}${duration}`
 }
 
-function tracksAtPath(path) {
+async function tracksAtPath(path) {
   const full = resolve(String(path))
   let stat = null
   try {
-    stat = fs.statSync(full)
+    stat = await fs.promises.stat(full)
   } catch {
     throw new Error(`No such file or directory: ${full}`)
   }
 
-  if (stat.isDirectory()) return filterAudioFiles(full)
+  if (stat.isDirectory()) return await filterAudioFiles(full)
 
   if (!AUDIO_EXTENSIONS.includes(extname(full).toLowerCase())) {
     throw new Error(`Not an audio file: ${full}`)
