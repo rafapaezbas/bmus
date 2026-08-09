@@ -17,8 +17,47 @@ npm install
 ## Usage
 
 ```bash
-bare index.js
+bmus
 ```
+
+## Headless mode
+
+Passing `--headless` starts bmus with no interface, as an [MCP](https://modelcontextprotocol.io) server speaking JSON-RPC over stdin/stdout. An AI assistant can then browse your library, build a queue, and control playback — the audio still comes out of your speakers, since it is the same player underneath.
+
+```bash
+bmus --headless
+```
+
+The process is not meant to be run by hand: it reads a protocol on stdin and writes one to stdout. Normally an MCP client launches it for you.
+
+### Using it with Claude Code
+
+```bash
+claude mcp add bmus -- bmus --headless
+```
+
+Then run `/mcp` inside Claude Code to check that it connected and to see the tools. Use an absolute path — the client spawns the command with its own working directory and `PATH`.
+
+### Using it with Claude Desktop
+
+Add an entry to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "bmus": {
+      "command": "bmus",
+      "args": ["--headless"]
+    }
+  }
+}
+```
+
+### Notes
+
+- **Only one bmus can run at a time.** The instance holds a lock on its storage, so a headless server will fail to start while the TUI is open, and vice versa. Quit one before starting the other.
+- **The queue lives in the process.** It is not persisted, and playback stops when the client disconnects and the server exits.
+- **stdout is the protocol channel.** Diagnostics go to stderr, so check stderr when a client reports the server as failing.
 
 ## Keybindings
 
@@ -43,6 +82,7 @@ Type a command in the input bar at the bottom:
 | --------- | ------------------------------------------------- |
 | `add-all` | Add all tracks in the current folder to the queue |
 | `clear`   | Clear the queue                                   |
+| `search`  | List every audio file under the current folder    |
 
 ## License
 
