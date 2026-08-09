@@ -1,6 +1,6 @@
 {
   "name": "bmus",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "bin": "bmus",
   "main": "index.js",
   "upgrade": "pear://kzfisrmyzniyx8u9sgw1a1unh79cpkra48emd4ci3hon8wwdi6yy",
