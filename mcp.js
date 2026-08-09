@@ -25,8 +25,6 @@ const server = new McpServer({
     'the queue, and control playback. Playback lasts only while this server is running.'
 })
 
-// ---- tools ----
-
 server.tool('now_playing', {
   description: 'Report the currently playing track, queue length, and shuffle state.',
   inputSchema: { type: 'object', properties: {} },
@@ -213,8 +211,6 @@ server.tool('search_library', {
   }
 })
 
-// ---- helpers ----
-
 function describe(track) {
   if (!track) return 'nothing'
   const common = track.metadata?.common || {}
@@ -286,8 +282,6 @@ function requireDirectory(path) {
   if (!stat.isDirectory()) throw new Error(`Not a directory: ${full}`)
   return full
 }
-
-// ---- lifecycle ----
 
 let closed = false
 
