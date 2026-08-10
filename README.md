@@ -36,7 +36,7 @@ The process is not meant to be run by hand: it reads a protocol on stdin and wri
 claude mcp add bmus -- bmus --headless
 ```
 
-Then run `/mcp` inside Claude Code to check that it connected and to see the tools. Use an absolute path — the client spawns the command with its own working directory and `PATH`.
+Then run `/mcp` inside Claude Code to check that it connected and to see the tools.
 
 ### Using it with Claude Desktop
 
