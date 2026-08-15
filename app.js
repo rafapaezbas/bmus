@@ -40,6 +40,10 @@ class App {
         })
       : null
 
+    this.timer = setInterval(() => {
+      program.send({ type: 'timer.tick' })
+    }, 1000)
+    this.secs = 0
     this._registerCommands()
   }
 
@@ -125,6 +129,10 @@ class App {
       case 'key':
         return this._updateKey(msg)
 
+      case 'timer.tick':
+        this.secs++
+        return
+
       default:
         return [this, null]
     }
@@ -132,6 +140,7 @@ class App {
 
   _updateKey(msg) {
     if (key.matches(msg, 'ctrl+c')) {
+      clearInterval(this.timer)
       this.player.stop()
       this.teardown()
       return [this, quit]
@@ -185,7 +194,10 @@ class App {
 
   _playlistKey(msg) {
     const selected = this.playlist.list.selected
-    if (key.matches(msg, 'enter')) this.player.play(selected)
+    if (key.matches(msg, 'enter')) {
+      this.secs = 0
+      this.player.play(selected)
+    }
     if (key.matches(msg, 'n')) this.player.next()
     if (key.matches(msg, 'q')) this.player.remove(selected)
     if (key.matches(msg, 'r')) this.player.toggleRandom()
