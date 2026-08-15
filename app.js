@@ -131,7 +131,7 @@ class App {
 
       case 'timer.tick':
         this.secs++
-        return
+        return [this, null]
 
       default:
         return [this, null]
