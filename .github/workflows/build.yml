@@ -41,11 +41,15 @@ jobs:
     outputs:
       artifact-links: ${{ steps.build.outputs.artifact-links }}
     steps:
-      - name: Setup bare
-        uses: holepunchto/actions/bare-base@v1
-
       - name: Checkout bmus
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: holepunchto/actions/node-base-extended@v1
+        with:
+          clean-install: true
+          version: 24
+          node-auth-token: ${{ github.token }}
 
       - name: Build linux x64
         id: build
@@ -66,11 +70,15 @@ jobs:
     outputs:
       artifact-links: ${{ steps.build.outputs.artifact-links }}
     steps:
-      - name: Setup bare
-        uses: holepunchto/actions/bare-base@v1
-
       - name: Checkout bmus
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: holepunchto/actions/node-base-extended@v1
+        with:
+          clean-install: true
+          version: 24
+          node-auth-token: ${{ github.token }}
 
       - name: Build linux arm
         id: build
@@ -91,11 +99,15 @@ jobs:
     outputs:
       artifact-links: ${{ steps.build.outputs.artifact-links }}
     steps:
-      - name: Setup bare
-        uses: holepunchto/actions/bare-base@v1
-
       - name: Checkout bmus
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: holepunchto/actions/node-base-extended@v1
+        with:
+          clean-install: true
+          version: 24
+          node-auth-token: ${{ github.token }}
 
       - name: Build macos
         id: build
@@ -123,11 +135,15 @@ jobs:
     outputs:
       artifact-links: ${{ steps.build.outputs.artifact-links }}
     steps:
-      - name: Setup bare
-        uses: holepunchto/actions/bare-base@v1
-
       - name: Checkout bmus
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: holepunchto/actions/node-base-extended@v1
+        with:
+          clean-install: true
+          version: 24
+          node-auth-token: ${{ github.token }}
 
       - name: Build macos x64
         id: build
@@ -157,6 +173,13 @@ jobs:
     steps:
       - name: Checkout bmus
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: holepunchto/actions/node-base-extended@v1
+        with:
+          clean-install: true
+          version: 24
+          node-auth-token: ${{ github.token }}
 
       - name: Build windows
         id: build
