@@ -6,7 +6,8 @@ const {
   searchAudioFiles,
   createFoldersOnlyFs,
   readTrackMetadata,
-  mapLimit
+  mapLimit,
+  PlayerTimer
 } = require('./lib/utils.js')
 const { TextInput, Preview, Playlist } = require('./lib/gui.js')
 const { render, layout, PANEL, PANEL_COUNT } = require('./lib/view.js')
@@ -23,6 +24,7 @@ class App {
     this.playlist = new Playlist()
     this.textInput = new TextInput()
     this.player = new Player(() => program.send({ type: 'track.ended' }))
+    this.playerTimer = new PlayerTimer(() => program.send({ type: 'timer.tick' }))
     this.width = undefined
     this.height = undefined
     this.fp = filepicker.create({ fs: createFoldersOnlyFs() })
@@ -30,7 +32,6 @@ class App {
     this.currentDir = null
     this.debug = ''
     this.teardown = opts.teardown
-
     this.updater = opts.updater
     this.updateWidget = opts.updater
       ? updaterWidget.create({
@@ -39,11 +40,6 @@ class App {
           }
         })
       : null
-
-    this.timer = setInterval(() => {
-      program.send({ type: 'timer.tick' })
-    }, 1000)
-    this.secs = 0
     this._registerCommands()
   }
 
@@ -108,6 +104,7 @@ class App {
         return [this, null]
 
       case 'track.ended':
+        this.playerTimer.restart()
         this.player.next()
         this._refreshLists()
         return [this, null]
@@ -130,7 +127,6 @@ class App {
         return this._updateKey(msg)
 
       case 'timer.tick':
-        this.secs++
         return [this, null]
 
       default:
@@ -195,10 +191,13 @@ class App {
   _playlistKey(msg) {
     const selected = this.playlist.list.selected
     if (key.matches(msg, 'enter')) {
-      this.secs = 0
+      this.playerTimer.restart()
       this.player.play(selected)
     }
-    if (key.matches(msg, 'n')) this.player.next()
+    if (key.matches(msg, 'n')) {
+      this.playerTimer.restart()
+      this.player.next()
+    }
     if (key.matches(msg, 'q')) this.player.remove(selected)
     if (key.matches(msg, 'r')) this.player.toggleRandom()
     this._refreshLists()
