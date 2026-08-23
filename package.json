@@ -1,6 +1,6 @@
 {
   "name": "bmus",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "bin": "bmus",
   "main": "index.js",
   "upgrade": "pear://kzfisrmyzniyx8u9sgw1a1unh79cpkra48emd4ci3hon8wwdi6yy",
@@ -22,6 +22,7 @@
     "bare-tui-updater": "^0.0.1",
     "corestore": "^7.11.1",
     "dcent-beats": "^3.0.0-alpha.4",
+    "fs-native-lock": "^1.2.0",
     "hyperswarm": "^4.17.0",
     "pear-runtime-updater": "^3.2.0",
     "ready-resource": "^1.2.0",

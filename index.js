@@ -1,6 +1,7 @@
 const path = require('bare-path')
 const os = require('bare-os')
 const { isWindows, isLinux } = require('which-runtime')
+const LockFile = require('fs-native-lock')
 const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
 const PearRuntimeUpdater = require('pear-runtime-updater')
@@ -10,6 +11,7 @@ const runHeadless = require('./mcp.js')
 
 const store = new Corestore(path.join(storage(), 'pear-runtime/corestore'))
 const swarm = new Hyperswarm()
+const lock = new LockFile(path.join(storage(), 'bmus.lock'))
 
 swarm.on('connection', (c) => {
   store.replicate(c)
@@ -27,13 +29,20 @@ const updater = new PearRuntimeUpdater({
 main()
 
 async function main() {
-  await store.ready()
-  await updater.ready()
-  swarm.join(updater.drive.core.discoveryKey)
+  try {
+    await lock.lock()
+  } catch {}
+
+  if (lock.locked) {
+    await store.ready()
+    await updater.ready()
+    swarm.join(updater.drive.core.discoveryKey)
+  }
+
   if (Bare.argv.includes('--headless')) {
     runHeadless(teardown)
   } else {
-    runGUI(teardown, updater)
+    runGUI(teardown, lock.locked ? updater : null)
   }
 }
 
@@ -46,4 +55,5 @@ function storage() {
 function teardown() {
   updater.close()
   swarm.destroy() // TODO report segmentation fault
+  lock.unlock()
 }
