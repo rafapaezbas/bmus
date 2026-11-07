@@ -13,7 +13,7 @@ bmus updates itself peer-to-peer. Using [`pear-runtime-updater`](https://github.
 ### With pear
 
 ```bash
-pear install pear://iodxgg93bjztrkhturcyheiq7j75zg8gy1m7s4sa8bkr6zyo8kqoy
+pear install pear://bmuso64fxkicaoszc69p6bxsrmzc9jjpq7n8r8jgmghnhrikh71o
 ```
 
 ### From the release page
