@@ -3,7 +3,7 @@
   "version": "1.5.4",
   "bin": "bmus",
   "main": "index.js",
-  "upgrade": "pear://iodxgg93bjztrkhturcyheiq7j75zg8gy1m7s4sa8bkr6zyo8kqoy",
+  "upgrade": "pear://iodxgg93bjztrkhturcyheiq7j75zg8gy1m7s4sa8bkr6zyo8kqo",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write . && lunte --fix .",
